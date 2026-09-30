@@ -10,6 +10,8 @@
  *   ?isolate=jaw      load everything but show only this part
  *   ?explode=0.5      exploded view
  *   ?bg=reference     garage-ish backdrop instead of black
+ *   ?set=jaw.open=0.8,eyes.lookX=0.4   set part params after load
+ *   ?pose=head.ry=0.3                   rotate rig joints (disable idle to keep it)
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -32,6 +34,18 @@ export function readFlags(search) {
     isolate: q.get('isolate') || null,
     explode: q.get('explode') ? parseFloat(q.get('explode')) : 0,
     bg: q.get('bg') || null,
+    // ?set=jaw.open=0.8,eyes.lookX=0.4  -> part params applied after loading
+    set: (q.get('set') || '').split(',').filter(Boolean).map((kv) => {
+      const [path, v] = kv.split('=');
+      const [part, key] = path.split('.');
+      return { part, key, value: v === 'true' ? true : v === 'false' ? false : parseFloat(v) };
+    }),
+    // ?pose=head.ry=0.3,neck.rx=0.1  -> rig joint rotations/positions
+    pose: (q.get('pose') || '').split(',').filter(Boolean).map((kv) => {
+      const [path, v] = kv.split('=');
+      const [joint, key] = path.split('.');
+      return { joint, key, value: parseFloat(v) };
+    }),
   };
 }
 
@@ -195,6 +209,8 @@ export async function createStage(container, { flags, onStatus } = {}) {
     animate: !capture,
   }).then(() => {
     if (flags.isolate) ultron.isolate(flags.isolate);
+    for (const { part, key, value } of flags.set) ultron.set(part, key, value);
+    for (const { joint, key, value } of flags.pose) ultron.rig.pose({ [joint]: { [key]: value } });
     // signal readiness a few frames later (Playwright waits on this)
     const start = frames;
     const wait = () => {

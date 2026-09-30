@@ -76,10 +76,12 @@ npm run dev -- -p 3000               # http://localhost:3000  (?debug for lil-gu
 node scripts/snap.mjs --port 3000 --tag mytag             # all parts, 3 views
 node scripts/snap.mjs --port 3000 --tag mytag --isolate jaw  # only show one part
 node scripts/snap.mjs --port 3000 --tag mytag --views closeup
+node scripts/snap.mjs --port 3000 --tag open --set jaw.open=0.8,lips.part=0.5  # verify a pose
 node scripts/compare.mjs --tag mytag  # screenshots/mytag/compare.png
 ```
 
 URL flags: `?debug`, `?capture=1`, `?view=front|threequarter|side|closeup|hero`,
-`?only=a,b`, `?isolate=part`, `?explode=0.6`.
+`?only=a,b`, `?isolate=part`, `?explode=0.6`, `?set=part.param=value,...`,
+`?pose=joint.rx=0.2,...`.
 Look at the PNGs (Read tool) and compare against the references for
 silhouette, proportions, plate flow, depth and glow. Iterate until it matches.

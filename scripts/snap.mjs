@@ -6,6 +6,7 @@
  *   node scripts/snap.mjs --port 3002 --tag jaw --isolate jaw
  *   node scripts/snap.mjs --views closeup --only eyes,faceplate,cranium
  *   node scripts/snap.mjs --url http://localhost:3000 --explode 0.6
+ *   node scripts/snap.mjs --tag jawopen --set jaw.open=0.8,lips.part=0.5 --views threequarter
  *
  * Needs a running server (`npm run dev -- -p <port>`).
  * Uses the pre-installed Chromium at /opt/pw-browsers/chromium (or $CHROMIUM).
@@ -42,7 +43,7 @@ page.on('pageerror', (e) => errors.push(`[pageerror] ${e.message}`));
 
 const extra = new URLSearchParams();
 extra.set('capture', '1');
-for (const k of ['only', 'isolate', 'explode', 'bg']) if (args[k]) extra.set(k, args[k]);
+for (const k of ['only', 'isolate', 'explode', 'bg', 'set', 'pose']) if (args[k]) extra.set(k, args[k]);
 
 const written = [];
 for (const view of views) {
