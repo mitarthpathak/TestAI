@@ -107,7 +107,7 @@ export async function createStage(container, { flags, onStatus } = {}) {
   const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType });
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new BloomEffect({
-    luminanceThreshold: 2.4,
+    luminanceThreshold: 3.6,
     luminanceSmoothing: 0.3,
     intensity: 2.6,
     mipmapBlur: true,

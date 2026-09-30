@@ -58,7 +58,7 @@ export function createStudioEnvironment(renderer) {
   box(9, 1.6, 0xffffff, 0.7, [0, -1, 12]);
   box(16, 8, 0x9a948a, 0.16, [0, 3, 15]);
   // small kicker for crisp specular pings
-  box(0.6, 3, 0xffffff, 2.4, [6, 5, 8]);
+  box(0.6, 3, 0xffffff, 1.2, [6, 5, 8]);
 
   const pmrem = new THREE.PMREMGenerator(renderer);
   const rt = pmrem.fromScene(env, 0.02);
@@ -74,11 +74,11 @@ export function createStudioEnvironment(renderer) {
 export function createLights() {
   const g = new THREE.Group();
   g.name = 'lights';
-  const key = new THREE.DirectionalLight(0xffffff, 2.2);
+  const key = new THREE.DirectionalLight(0xffffff, 1.3);
   key.position.set(2.5, 7, 5);
-  const rimL = new THREE.DirectionalLight(0xbfd4ff, 2.6);
+  const rimL = new THREE.DirectionalLight(0xbfd4ff, 1.5);
   rimL.position.set(-6, 3, -4);
-  const rimR = new THREE.DirectionalLight(0xffe2c8, 2.0);
+  const rimR = new THREE.DirectionalLight(0xffe2c8, 1.2);
   rimR.position.set(6, 2.5, -5);
   const fill = new THREE.HemisphereLight(0x8a93a0, 0x151210, 0.35);
   // red bounce from the eyes onto cheeks / nose

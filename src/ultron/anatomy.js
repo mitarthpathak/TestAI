@@ -247,9 +247,9 @@ export function insideCutout(point, names = Object.keys(CUTOUTS), pad = 0) {
 /** Camera presets used by the page and by the Playwright capture script. */
 export const VIEWS = {
   // azimuth: degrees around Y towards the model's left (+X); elevation: degrees up
-  front:        { azimuth: 0,  elevation: -3, distance: 7.4, target: [0, 1.95, 0] },
-  threequarter: { azimuth: 36, elevation: 4,  distance: 7.2, target: [0, 2.0, 0] },
-  side:         { azimuth: 90, elevation: 0,  distance: 7.6, target: [0, 1.9, 0] },
+  front:        { azimuth: 0,  elevation: -3, distance: 6.3, target: [0, 2.12, 0] },
+  threequarter: { azimuth: 36, elevation: 4,  distance: 6.3, target: [0, 2.15, 0] },
+  side:         { azimuth: 90, elevation: 0,  distance: 6.8, target: [0, 2.05, 0] },
   closeup:      { azimuth: 12, elevation: 2,  distance: 4.6, target: [0, 2.3, 0.2] },
-  hero:         { azimuth: 0,  elevation: -4, distance: 8.4, target: [0, 1.8, 0] },
+  hero:         { azimuth: 0,  elevation: -4, distance: 7.2, target: [0, 2.0, 0] },
 };
