@@ -1,0 +1,255 @@
+/**
+ * ANATOMY — the shared coordinate contract for every Ultron part.
+ *
+ * OWNER: lead / integrator. Part sessions must NOT edit this file.
+ * If a part needs a landmark moved, say so in your report instead.
+ *
+ * Conventions
+ *  - Units are arbitrary "head units" (~ chin-to-crown = 2.3).
+ *  - +Y is up, +Z is forward (the face looks down +Z), +X is the MODEL'S LEFT
+ *    (the viewer's right when looking at the face).
+ *  - Two authoring spaces:
+ *      BODY space: origin at the centre of the collar line (sternal notch).
+ *                  Used by `neck` and `collar`.
+ *      HEAD space: origin at the head joint (atlas, top of the neck).
+ *                  Used by every face / skull part.
+ *    `ctx.space(jointName)` hands a part a Group in which it can author in
+ *    the joint's space while still being driven by that joint's rotation.
+ */
+import * as THREE from 'three';
+
+// ---------------------------------------------------------------------------
+// Joints. `pos` is expressed in the authoring space named by `space`.
+// The rig converts these into a parent/child hierarchy of pivots.
+// ---------------------------------------------------------------------------
+export const JOINTS = {
+  root:   { parent: null,    space: 'body', pos: [0, 0, 0] },
+  chest:  { parent: 'root',  space: 'body', pos: [0, 0, 0] },
+  neck:   { parent: 'chest', space: 'body', pos: [0, 0.35, -0.02] },
+  head:   { parent: 'neck',  space: 'body', pos: [0, 1.3, -0.05] },   // == HEAD space origin
+  jaw:    { parent: 'head',  space: 'head', pos: [0, 0.46, 0.02] },    // hinge axis = X
+  eyeL:   { parent: 'head',  space: 'head', pos: [0.335, 0.93, 0.645] },
+  eyeR:   { parent: 'head',  space: 'head', pos: [-0.335, 0.93, 0.645] },
+  browL:  { parent: 'head',  space: 'head', pos: [0.33, 1.08, 0.66] },
+  browR:  { parent: 'head',  space: 'head', pos: [-0.33, 1.08, 0.66] },
+  cheekL: { parent: 'head',  space: 'head', pos: [0.54, 0.39, 0.51] },
+  cheekR: { parent: 'head',  space: 'head', pos: [-0.54, 0.39, 0.51] },
+  finL:   { parent: 'head',  space: 'head', pos: [0.66, 1.42, 0.12] },
+  finR:   { parent: 'head',  space: 'head', pos: [-0.66, 1.42, 0.12] },
+  lipUpper: { parent: 'head', space: 'head', pos: [0, 0.2, 0.66] },
+  lipLower: { parent: 'jaw',  space: 'head', pos: [0, 0.12, 0.64] },
+};
+
+// ---------------------------------------------------------------------------
+// Key landmarks (HEAD space unless noted). Parts should derive placement
+// from these rather than hard-coding numbers, so the face stays coherent.
+// ---------------------------------------------------------------------------
+export const LANDMARKS = {
+  crownTop:     [0, 2.0, -0.1],
+  chinBottom:   [0, -0.3, 0.52],
+  chinButton:   [0, -0.12, 0.64],     // the round "button" on the chin
+  mouthCenter:  [0, 0.16, 0.68],
+  noseTip:      [0, 0.55, 0.86],      // bottom of the central nose plate
+  browCenter:   [0, 1.12, 0.8],
+  eyeL:         JOINTS.eyeL.pos,
+  eyeR:         JOINTS.eyeR.pos,
+  eyeRadius:    0.075,                 // radius of the glowing iris disc
+  socketRadii:  [0.19, 0.1, 0.12],     // eye socket ellipsoid (x, y, z)
+  socketTilt:   0.32,                  // radians; outer corner raised (angry slant)
+  cheekDiscL:   JOINTS.cheekL.pos,
+  cheekDiscR:   JOINTS.cheekR.pos,
+  cheekDiscRadius: 0.27,
+  cheekDiscNormalL: [0.76, -0.12, 0.64], // outward facing direction of the disc
+  jawHinge:     JOINTS.jaw.pos,
+  templeL:      [0.72, 1.3, 0.2],
+  templeR:      [-0.72, 1.3, 0.2],
+  // Side blades ("fins"): control points for the LEFT blade, HEAD space.
+  // Mirror X for the right blade.
+  finCurveL: [
+    [0.62, 1.55, 0.02],
+    [0.88, 1.42, 0.1],
+    [1.06, 1.05, 0.2],
+    [1.08, 0.62, 0.3],
+    [0.96, 0.25, 0.42],
+    [0.76, 0.0, 0.5],
+  ],
+  // BODY space
+  neckBase:     [0, 0.3, -0.02],
+  neckTop:      [0, 1.3, -0.05],
+  neckRadius:   0.42,
+  collarWidth:  1.9,    // half-span to the shoulder tip
+  collarY:      0.1,
+};
+
+// ---------------------------------------------------------------------------
+// Head shell profile. A stack of superellipse cross-sections (HEAD space).
+//   y   : height of the section
+//   w   : half width (X)
+//   zf  : depth in front of the section centre (+Z)
+//   zb  : depth behind the section centre (-Z)
+//   n   : superellipse exponent (2 = ellipse, higher = boxier)
+//   zc  : Z offset of the section centre
+// Sampled with Catmull-Rom so the shell is smooth.
+// ---------------------------------------------------------------------------
+export const HEAD_PROFILE = [
+  { y: -0.3,  w: 0.2,  zf: 0.18, zb: 0.2,  n: 2.2, zc: 0.4 },
+  { y: -0.15, w: 0.34, zf: 0.26, zb: 0.34, n: 2.4, zc: 0.37 },
+  { y: 0.1,   w: 0.52, zf: 0.4,  zb: 0.55, n: 2.6, zc: 0.28 },
+  { y: 0.4,   w: 0.66, zf: 0.52, zb: 0.74, n: 2.8, zc: 0.18 },
+  { y: 0.75,  w: 0.74, zf: 0.62, zb: 0.86, n: 2.8, zc: 0.1 },
+  { y: 1.05,  w: 0.77, zf: 0.68, zb: 0.95, n: 2.6, zc: 0.06 },
+  { y: 1.33,  w: 0.72, zf: 0.64, zb: 0.97, n: 2.4, zc: 0.02 },
+  { y: 1.55,  w: 0.6,  zf: 0.54, zb: 0.9,  n: 2.2, zc: -0.02 },
+  { y: 1.72,  w: 0.46, zf: 0.43, zb: 0.76, n: 2.1, zc: -0.05 },
+  { y: 1.86,  w: 0.31, zf: 0.29, zb: 0.55, n: 2.0, zc: -0.08 },
+  { y: 1.96,  w: 0.15, zf: 0.14, zb: 0.28, n: 2.0, zc: -0.1 },
+  { y: 2.0,   w: 0.0,  zf: 0.0,  zb: 0.0,  n: 2.0, zc: -0.1 },
+];
+
+const HEAD_Y_MIN = HEAD_PROFILE[0].y;
+const HEAD_Y_MAX = HEAD_PROFILE[HEAD_PROFILE.length - 1].y;
+export const HEAD_Y_RANGE = [HEAD_Y_MIN, HEAD_Y_MAX];
+
+function catmull(p0, p1, p2, p3, t) {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+}
+
+/** Interpolated cross-section at height y (HEAD space). */
+export function headSection(y) {
+  const P = HEAD_PROFILE;
+  const yy = THREE.MathUtils.clamp(y, HEAD_Y_MIN, HEAD_Y_MAX);
+  let i = 0;
+  while (i < P.length - 2 && P[i + 1].y < yy) i++;
+  const a = P[Math.max(0, i - 1)];
+  const b = P[i];
+  const c = P[i + 1];
+  const d = P[Math.min(P.length - 1, i + 2)];
+  const t = (yy - b.y) / (c.y - b.y || 1);
+  const out = { y: yy };
+  for (const k of ['w', 'zf', 'zb', 'n', 'zc']) {
+    out[k] = catmull(a[k], b[k], c[k], d[k], t);
+  }
+  out.w = Math.max(0, out.w);
+  out.zf = Math.max(0, out.zf);
+  out.zb = Math.max(0, out.zb);
+  return out;
+}
+
+const sgnPow = (v, e) => Math.sign(v) * Math.pow(Math.abs(v), e);
+
+/**
+ * Point on the head shell. `u` is the angle around the head:
+ *   u = 0 -> front centre (+Z), u = +PI/2 -> model's left (+X), u = +-PI -> back.
+ */
+export function headSurface(u, y, target = new THREE.Vector3()) {
+  const s = headSection(y);
+  const e = 2 / s.n;
+  const su = Math.sin(u);
+  const cu = Math.cos(u);
+  const d = cu >= 0 ? s.zf : s.zb;
+  return target.set(s.w * sgnPow(su, e), y, s.zc + d * sgnPow(cu, e));
+}
+
+/** Outward unit normal of the head shell at (u, y), by finite differences. */
+export function headNormal(u, y, target = new THREE.Vector3()) {
+  const h = 1e-3;
+  const p0 = headSurface(u - h, y, new THREE.Vector3());
+  const p1 = headSurface(u + h, y, new THREE.Vector3());
+  const q0 = headSurface(u, y - h, new THREE.Vector3());
+  const q1 = headSurface(u, y + h, new THREE.Vector3());
+  const du = p1.sub(p0);
+  const dv = q1.sub(q0);
+  target.crossVectors(du, dv).normalize();
+  // make sure it points away from the head axis
+  const c = headSurface(u, y, new THREE.Vector3());
+  const s = headSection(y);
+  const radial = new THREE.Vector3(c.x, 0, c.z - s.zc);
+  if (radial.lengthSq() > 1e-8 && target.dot(radial) < 0) target.negate();
+  return target;
+}
+
+/**
+ * Front surface depth at (x, y): solves the superellipse for z on the FRONT
+ * half. Returns null when x is outside the section.
+ */
+export function headFrontZ(x, y) {
+  const s = headSection(y);
+  if (Math.abs(x) >= s.w) return null;
+  const t = Math.pow(1 - Math.pow(Math.abs(x) / s.w, s.n), 1 / s.n);
+  return s.zc + s.zf * t;
+}
+
+/** Angle `u` on the front half that corresponds to a given x at height y. */
+export function headAngleForX(x, y) {
+  const s = headSection(y);
+  const r = THREE.MathUtils.clamp(x / (s.w || 1), -1, 1);
+  // x = w * sgn(sin u) |sin u|^(2/n)  =>  |sin u| = |r|^(n/2)
+  return Math.asin(Math.sign(r) * Math.pow(Math.abs(r), s.n / 2));
+}
+
+export const v3 = (a) => new THREE.Vector3(a[0], a[1], a[2]);
+export const mirrorX = (a) => [-a[0], a[1], a[2]];
+
+// ---------------------------------------------------------------------------
+// CUTOUTS — volumes that shell / plate parts must keep clear so recessed
+// features (eye sockets, cheek discs) are not buried. HEAD space.
+//   ellipsoid: { center, radii, rotation (Euler XYZ) }
+//   cylinder : { center, axis, radius, halfLength }
+// Use geo.carve(geometry, names) for closed plates (CSG) and
+// anatomy.insideCutout(point, names) to mask thin sheets.
+// ---------------------------------------------------------------------------
+const eyeCut = (side) => ({
+  type: 'ellipsoid',
+  center: [0.335 * side, 0.93, 0.745],
+  radii: [LANDMARKS.socketRadii[0], LANDMARKS.socketRadii[1], 0.3],
+  rotation: [0, side * 0.35, side * LANDMARKS.socketTilt],
+});
+const discCut = (side) => ({
+  type: 'cylinder',
+  center: [0.54 * side, 0.39, 0.51],
+  axis: [0.76 * side, -0.12, 0.64],
+  radius: LANDMARKS.cheekDiscRadius * 1.04,
+  halfLength: 0.3,
+});
+export const CUTOUTS = {
+  eyeL: eyeCut(1),
+  eyeR: eyeCut(-1),
+  cheekL: discCut(1),
+  cheekR: discCut(-1),
+};
+
+const _q = new THREE.Quaternion();
+const _e = new THREE.Euler();
+const _p = new THREE.Vector3();
+const _ax = new THREE.Vector3();
+/** True if a HEAD-space point lies inside any of the named cutouts. */
+export function insideCutout(point, names = Object.keys(CUTOUTS), pad = 0) {
+  for (const name of names) {
+    const c = CUTOUTS[name];
+    _p.set(point.x - c.center[0], point.y - c.center[1], point.z - c.center[2]);
+    if (c.type === 'ellipsoid') {
+      _q.setFromEuler(_e.set(c.rotation[0], c.rotation[1], c.rotation[2])).invert();
+      _p.applyQuaternion(_q);
+      const r = c.radii;
+      if ((_p.x / (r[0] + pad)) ** 2 + (_p.y / (r[1] + pad)) ** 2 + (_p.z / (r[2] + pad)) ** 2 < 1) return true;
+    } else {
+      _ax.set(c.axis[0], c.axis[1], c.axis[2]).normalize();
+      const along = _p.dot(_ax);
+      const radial = _p.addScaledVector(_ax, -along).length();
+      if (Math.abs(along) < c.halfLength && radial < c.radius + pad) return true;
+    }
+  }
+  return false;
+}
+
+/** Camera presets used by the page and by the Playwright capture script. */
+export const VIEWS = {
+  // azimuth: degrees around Y towards the model's left (+X); elevation: degrees up
+  front:        { azimuth: 0,  elevation: -3, distance: 7.4, target: [0, 1.95, 0] },
+  threequarter: { azimuth: 36, elevation: 4,  distance: 7.2, target: [0, 2.0, 0] },
+  side:         { azimuth: 90, elevation: 0,  distance: 7.6, target: [0, 1.9, 0] },
+  closeup:      { azimuth: 12, elevation: 2,  distance: 4.6, target: [0, 2.3, 0.2] },
+  hero:         { azimuth: 0,  elevation: -4, distance: 8.4, target: [0, 1.8, 0] },
+};

@@ -1,0 +1,24 @@
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
+body { -webkit-font-smoothing: antialiased; }
+.stage { position: fixed; inset: 0; }
+.stage canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+
+/* textless part-loading rail (left side) */
+.rail {
+  position: fixed; left: 28px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 10px; z-index: 5; pointer-events: none;
+}
+.rail i {
+  display: block; width: 3px; height: 22px; border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 0.5s ease, box-shadow 0.5s ease, width 0.5s ease;
+}
+.rail i[data-s="loading"] { background: rgba(255, 40, 20, 0.45); animation: blink 0.6s ease-in-out infinite alternate; }
+.rail i[data-s="ready"] { background: #ff2a14; box-shadow: 0 0 10px rgba(255, 30, 10, 0.8); width: 4px; }
+.rail i[data-s="error"] { background: #555; }
+.rail i[data-s="skipped"] { opacity: 0.2; }
+.rail.done i { background: rgba(255, 42, 20, 0.35); box-shadow: none; width: 3px; transition-delay: 0.8s; }
+@keyframes blink { from { opacity: 0.35; } to { opacity: 1; } }
+@media (max-width: 600px) { .rail { left: 14px; gap: 7px; } .rail i { height: 14px; } }
+.capture .rail { display: none; }
