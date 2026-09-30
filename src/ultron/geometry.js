@@ -263,7 +263,7 @@ export function conformPlate(shape, o = {}) {
     bevelSegments: 3,
     curveSegments: o.curveSegments ?? 24,
   });
-  geo = geo.toNonIndexed();
+  if (geo.index) geo = geo.toNonIndexed();
   geo.deleteAttribute('normal');
   const tess = new TessellateModifier(maxEdge, 8);
   geo = tess.modify(geo);

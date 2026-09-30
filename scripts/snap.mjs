@@ -61,7 +61,7 @@ for (const view of views) {
 }
 
 await browser.close();
-const filtered = errors.filter((e) => !/GPU stall|WebGL-|swiftshader|Automatic fallback/i.test(e));
+const filtered = errors.filter((e) => !/GPU stall|WebGL-|swiftshader|Automatic fallback|maxLeafSize/i.test(e));
 if (filtered.length) {
   console.log(`\n${filtered.length} console error(s)/warning(s):`);
   for (const e of [...new Set(filtered)].slice(0, 30)) console.log('  ' + e);
