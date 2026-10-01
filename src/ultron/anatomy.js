@@ -45,7 +45,7 @@ export const JOINTS = {
 // from these rather than hard-coding numbers, so the face stays coherent.
 // ---------------------------------------------------------------------------
 export const LANDMARKS = {
-  crownTop:     [0, 2.0, -0.1],
+  crownTop:     [0, 2.1, 0.03],
   chinBottom:   [0, -0.3, 0.52],
   chinButton:   [0, -0.12, 0.64],     // the round "button" on the chin
   mouthCenter:  [0, 0.16, 0.68],
@@ -96,14 +96,14 @@ export const HEAD_PROFILE = [
   { y: -0.15, w: 0.34, zf: 0.26, zb: 0.34, n: 2.4, zc: 0.37 },
   { y: 0.1,   w: 0.52, zf: 0.4,  zb: 0.55, n: 2.6, zc: 0.28 },
   { y: 0.4,   w: 0.66, zf: 0.52, zb: 0.74, n: 2.8, zc: 0.18 },
-  { y: 0.75,  w: 0.73, zf: 0.62, zb: 0.9,  n: 2.6, zc: 0.1 },
-  { y: 1.05,  w: 0.79, zf: 0.68, zb: 1.0,  n: 2.4, zc: 0.05 },
-  { y: 1.33,  w: 0.8,  zf: 0.65, zb: 1.04, n: 2.3, zc: 0.0 },
-  { y: 1.55,  w: 0.74, zf: 0.57, zb: 0.98, n: 2.2, zc: -0.04 },
-  { y: 1.72,  w: 0.62, zf: 0.46, zb: 0.84, n: 2.1, zc: -0.07 },
-  { y: 1.86,  w: 0.45, zf: 0.32, zb: 0.62, n: 2.0, zc: -0.1 },
-  { y: 1.96,  w: 0.24, zf: 0.16, zb: 0.33, n: 2.0, zc: -0.12 },
-  { y: 2.0,   w: 0.0,  zf: 0.0,  zb: 0.0,  n: 2.0, zc: -0.12 },
+  { y: 0.75,  w: 0.73, zf: 0.62, zb: 0.82, n: 2.6, zc: 0.1 },
+  { y: 1.05,  w: 0.79, zf: 0.68, zb: 0.88, n: 2.4, zc: 0.06 },
+  { y: 1.33,  w: 0.8,  zf: 0.68, zb: 0.88, n: 2.3, zc: 0.04 },
+  { y: 1.58,  w: 0.77, zf: 0.64, zb: 0.82, n: 2.2, zc: 0.03 },
+  { y: 1.8,   w: 0.67, zf: 0.55, zb: 0.7,  n: 2.1, zc: 0.03 },
+  { y: 1.96,  w: 0.5,  zf: 0.41, zb: 0.52, n: 2.0, zc: 0.03 },
+  { y: 2.06,  w: 0.28, zf: 0.23, zb: 0.29, n: 2.0, zc: 0.03 },
+  { y: 2.1,   w: 0.0,  zf: 0.0,  zb: 0.0,  n: 2.0, zc: 0.03 },
 ];
 
 const HEAD_Y_MIN = HEAD_PROFILE[0].y;
@@ -309,11 +309,12 @@ export function warpHeadNormal(p, n) {
 /** Camera presets used by the page and by the Playwright capture script. */
 export const VIEWS = {
   // azimuth: degrees around Y towards the model's left (+X); elevation: degrees up
-  front:        { azimuth: 0,  elevation: -3, distance: 7.0, target: [0, 1.85, 0] },
-  threequarter: { azimuth: 36, elevation: 4,  distance: 7.0, target: [0, 1.9, 0] },
-  side:         { azimuth: 90, elevation: 0,  distance: 7.2, target: [0, 1.85, 0] },
+  front:        { azimuth: 0,  elevation: -3, distance: 7.4, target: [0, 1.95, 0] },
+  threequarter: { azimuth: 36, elevation: 4,  distance: 7.4, target: [0, 2.0, 0] },
+  side:         { azimuth: 90, elevation: 0,  distance: 7.6, target: [0, 1.95, 0] },
   closeup:      { azimuth: 12, elevation: 2,  distance: 4.6, target: [0, 2.3, 0.2] },
-  film34:       { azimuth: 42, elevation: -9, distance: 6.4, target: [0, 1.9, 0.1] },
-  filmfront:    { azimuth: 8,  elevation: -6, distance: 6.6, target: [0, 1.85, 0.1] },
+  film34:       { azimuth: 42, elevation: -9, distance: 7.0, target: [0, 2.0, 0.1] },
+  filmfront:    { azimuth: 8,  elevation: -6, distance: 7.2, target: [0, 1.95, 0.1] },
+  back34:       { azimuth: 125, elevation: 6, distance: 7.0, target: [0, 2.0, 0] },
   hero:         { azimuth: 0,  elevation: -4, distance: 7.6, target: [0, 1.8, 0] },
 };

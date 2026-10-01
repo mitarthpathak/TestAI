@@ -50,7 +50,7 @@ export function build(ctx) {
   // ------------------------------------------------------------ 1. dark under-shell
   const under = geo.surfaceSheet({
     surface: field.surfaceFn, normal: field.normalFn,
-    u0: -Math.PI, u1: Math.PI, y0: -0.28, y1: 1.995, segU: 160, segV: 110, offset: -0.028,
+    u0: -Math.PI, u1: Math.PI, y0: -0.28, y1: anatomy.HEAD_Y_RANGE[1] - 0.005, segU: 160, segV: 110, offset: -0.028,
     // keep clear of the eye sockets and cheek discs so they stay visible
     keep: (p) => !anatomy.insideCutout(p, ['eyeL', 'eyeR', 'cheekL', 'cheekR'], -0.01),
   });
