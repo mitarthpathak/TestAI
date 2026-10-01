@@ -193,6 +193,10 @@ export function build(ctx) {
   const cavityMat = M.get('cavity');
   const lensMat = M.get('cavity', { roughness: 0.12, metalness: 0.4, color: 0x0b0b0e });
   const ventMat = M.get('redAccent', { intensity: 0.42 });
+  // dim red glow deep in the hub (kept below the bloom threshold; pulse brightens it)
+  const CORE_RGB = new THREE.Color(1.0, 0.06, 0.03);
+  const coreMat = new THREE.MeshBasicMaterial({ color: CORE_RGB.clone().multiplyScalar(2.2), toneMapped: false });
+  const haloMat = new THREE.MeshBasicMaterial({ color: CORE_RGB.clone().multiplyScalar(1.0), toneMapped: false });
 
   // ------------------------------------------------ static housing (L frame)
   // depths (disc frame, joint = 0). The skull sits ~+0.03 over the centre and
@@ -232,9 +236,9 @@ export function build(ctx) {
     const ends = Math.pow(Math.sin(Math.PI * a), 0.45);
     const jaw = 1 - 0.3 * Math.pow(Math.max(0, 0.4 - a) / 0.4, 1.3); // narrower toward the jaw
     const eye = 1 - 0.45 * Math.pow(Math.max(0, a - 0.72) / 0.28, 1.2); // keep clear of the eye
-    return (0.028 + 0.12 * ends * jaw) * eye;
+    return (0.04 + 0.13 * ends * jaw) * eye;
   };
-  const B_IN = 0.328;
+  const B_IN = 0.322;
   // band top: a shallow cone parallel to the disc face in the middle of the
   // C (stands proud of the skull where the head falls away), diving onto the
   // skull at both ends so it flows into the face plates.
@@ -249,12 +253,13 @@ export function build(ctx) {
     th0: TH0, th1: TH1,
     rIn: () => B_IN * K,
     rOut: (u) => (B_IN + bandWidth(u)) * K,
-    zTop: bandTop, offset: 0, thickness: 0.24, bevel: 0.02,
-    // a crest line near the inner edge
+    zTop: bandTop, offset: 0, thickness: 0.24, bevel: 0.03,
+    // rounded torus-like crown (peaks toward the inner edge, hugging the disc)
     lift: (u, v) => {
       const a = THREE.MathUtils.clamp(along(u), 0, 1);
-      const mid = Math.pow(Math.sin(Math.PI * a), 0.6);
-      return 0.012 * Math.exp(-Math.pow((v - 0.72) / 0.26, 2)) * mid;
+      const mid = Math.pow(Math.sin(Math.PI * a), 0.5);
+      const crown = Math.pow(Math.sin(Math.PI * THREE.MathUtils.clamp(0.08 + v * 0.84, 0, 1)), 0.6);
+      return (0.034 * crown + 0.01 * Math.exp(-Math.pow((v - 0.7) / 0.2, 2))) * mid;
     },
     segU: 110, segV: 12,
   });
@@ -340,9 +345,13 @@ export function build(ctx) {
     { r: 0.0, z: Z.lens + 0.012 }, { r: 0.014, z: Z.lens + 0.011 }, { r: 0.016, z: Z.lens + 0.006 },
     { r: 0.03, z: Z.lens + 0.004 }, { r: 0.032, z: Z.lens }, { r: 0.047, z: Z.lens - 0.004 }, { r: 0.047, z: Z.lens - 0.01 },
   ], 64);
-  const pinGeo = polarLathe([
-    { r: 0.0, z: Z.lens + 0.02 }, { r: 0.006, z: Z.lens + 0.019 }, { r: 0.009, z: Z.lens + 0.014 }, { r: 0.009, z: Z.lens + 0.008 },
-  ], 32);
+
+  // red lens core: concentric glowing rings in the lens + a faint halo ring on the floor
+  const coreGeo = geo.mergeGeometries([
+    polarLathe([{ r: 0.0, z: Z.lens + 0.0125 }, { r: 0.009, z: Z.lens + 0.0125 }], 32),
+    polarLathe([{ r: 0.017, z: Z.lens + 0.0075 }, { r: 0.0285, z: Z.lens + 0.0055 }], 48),
+  ].map((g) => (g.index ? g.toNonIndexed() : g)), false);
+  const haloGeo = polarLathe([{ r: 0.068, z: Z.floor + 0.004 }, { r: 0.1, z: Z.floor + 0.004 }], 64);
 
   // --------------------------------------------------------------- assemble
   const mirror = (g) => geo.mirrorGeometryX(g);
@@ -394,7 +403,8 @@ export function build(ctx) {
     stack.add(hub);
     add(hub, bezelGeo, innerMat, `cheeks.bezel.${key}`);
     add(hub, lensGeo, lensMat, `cheeks.lens.${key}`);
-    add(hub, pinGeo, rimMat, `cheeks.pin.${key}`);
+    add(hub, coreGeo, coreMat, `cheeks.core.${key}`);
+    add(rotor, haloGeo, haloMat, `cheeks.halo.${key}`);
 
     sides[key] = { side, stack, rotor, hub, vanes };
   }
@@ -435,6 +445,7 @@ export function build(ctx) {
       s.hub.scale.setScalar(1 + p.pulse * 0.08);
       s.stack.position.z = -p.recess * 0.05;
     }
+    coreMat.color.copy(CORE_RGB).multiplyScalar(2.2 + 1.2 * THREE.MathUtils.clamp(p.pulse, 0, 1));
   };
   return {
     params,
