@@ -31,6 +31,7 @@ export class Ultron {
     this.object.add(this.rig.root);
     this.parts = {};
     this.status = {}; // id -> 'pending' | 'loading' | 'ready' | 'error'
+    this.timings = {}; // id -> build ms (import + build + warp)
     for (const p of PARTS) this.status[p.id] = 'pending';
     this.listeners = new Set();
     this.explode = 0;
@@ -74,6 +75,7 @@ export class Ultron {
   async loadPart(entry, { animate = true } = {}) {
     this.status[entry.id] = 'loading';
     this._emit({ type: 'status', id: entry.id, status: 'loading' });
+    const t0 = performance.now();
     try {
       const mod = await entry.load();
       const { ctx, groups } = this._context(entry.id);
@@ -114,6 +116,7 @@ export class Ultron {
       this.parts[entry.id] = part;
       this._applyGroupOffsets(part);
       this.status[entry.id] = 'ready';
+      this.timings[entry.id] = Math.round(performance.now() - t0);
       this._emit({ type: 'status', id: entry.id, status: 'ready' });
       return part;
     } catch (err) {

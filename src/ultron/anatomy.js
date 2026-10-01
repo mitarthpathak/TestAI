@@ -27,56 +27,65 @@ export const JOINTS = {
   chest:  { parent: 'root',  space: 'body', pos: [0, 0, 0] },
   neck:   { parent: 'chest', space: 'body', pos: [0, 0.35, -0.02] },
   head:   { parent: 'neck',  space: 'body', pos: [0, 1.3, -0.05] },   // == HEAD space origin
-  jaw:    { parent: 'head',  space: 'head', pos: [0, 0.46, 0.02] },    // hinge axis = X
+  jaw:    { parent: 'head',  space: 'head', pos: [0, 0.4, 0.04] },     // hinge axis = X
   eyeL:   { parent: 'head',  space: 'head', pos: [0.335, 0.93, 0.645] },
   eyeR:   { parent: 'head',  space: 'head', pos: [-0.335, 0.93, 0.645] },
-  browL:  { parent: 'head',  space: 'head', pos: [0.33, 1.08, 0.66] },
-  browR:  { parent: 'head',  space: 'head', pos: [-0.33, 1.08, 0.66] },
-  cheekL: { parent: 'head',  space: 'head', pos: [0.54, 0.39, 0.51] },
-  cheekR: { parent: 'head',  space: 'head', pos: [-0.54, 0.39, 0.51] },
-  finL:   { parent: 'head',  space: 'head', pos: [0.79, 1.42, 0.12] },
-  finR:   { parent: 'head',  space: 'head', pos: [-0.79, 1.42, 0.12] },
-  lipUpper: { parent: 'head', space: 'head', pos: [0, 0.2, 0.66] },
-  lipLower: { parent: 'jaw',  space: 'head', pos: [0, 0.12, 0.64] },
+  browL:  { parent: 'head',  space: 'head', pos: [0.33, 1.08, 0.68] },
+  browR:  { parent: 'head',  space: 'head', pos: [-0.33, 1.08, 0.68] },
+  cheekL: { parent: 'head',  space: 'head', pos: [0.5, 0.46, 0.42] },
+  cheekR: { parent: 'head',  space: 'head', pos: [-0.5, 0.46, 0.42] },
+  finL:   { parent: 'head',  space: 'head', pos: [0.64, 1.6, -0.12] },
+  finR:   { parent: 'head',  space: 'head', pos: [-0.64, 1.6, -0.12] },
+  lipUpper: { parent: 'head', space: 'head', pos: [0, 0.27, 0.88] },
+  lipLower: { parent: 'jaw',  space: 'head', pos: [0, 0.21, 0.86] },
 };
 
 // ---------------------------------------------------------------------------
 // Key landmarks (HEAD space unless noted). Parts should derive placement
 // from these rather than hard-coding numbers, so the face stays coherent.
+//
+// Proportions are measured from reference/ultron-front.png and the film
+// frames (scripts/overlay.mjs aligns renders to them by the eyes). With
+// E = eye spacing (0.67): crown 1.55E above the eyes, mouth 1.0E below,
+// chin bottom ~1.85E below, cheek-disc centres 0.7E below and 0.75E apart.
 // ---------------------------------------------------------------------------
 export const LANDMARKS = {
-  crownTop:     [0, 2.0, -0.1],
-  chinBottom:   [0, -0.3, 0.52],
-  chinButton:   [0, -0.12, 0.64],     // the round "button" on the chin
-  mouthCenter:  [0, 0.16, 0.68],
-  noseTip:      [0, 0.55, 0.86],      // bottom of the central nose plate
-  browCenter:   [0, 1.12, 0.8],
+  crownTop:     [0, 1.96, -0.12],
+  chinBottom:   [0, -0.32, 0.6],
+  chinButton:   [0, -0.14, 0.76],     // the round "button" on the front of the chin
+  mouthCenter:  [0, 0.24, 0.88],      // mouth slit, on the forward muzzle
+  mouthHalfWidth: 0.25,
+  noseTip:      [0, 0.5, 0.9],        // bottom of the central nose plate (just above the upper lip)
+  browCenter:   [0, 1.1, 0.8],
   eyeL:         JOINTS.eyeL.pos,
   eyeR:         JOINTS.eyeR.pos,
-  eyeRadius:    0.075,                 // radius of the glowing iris disc
-  socketRadii:  [0.19, 0.1, 0.12],     // eye socket ellipsoid (x, y, z)
-  socketTilt:   0.32,                  // radians; outer corner raised (angry slant)
+  eyeRadius:    0.06,                  // radius of the glowing iris disc
+  socketRadii:  [0.17, 0.085, 0.12],   // eye socket ellipsoid (x, y, z)
+  socketTilt:   0.3,                   // radians; outer corner raised (angry slant)
   cheekDiscL:   JOINTS.cheekL.pos,
   cheekDiscR:   JOINTS.cheekR.pos,
-  cheekDiscRadius: 0.27,
-  cheekDiscNormalL: [0.76, -0.12, 0.64], // outward facing direction of the disc
+  cheekDiscRadius: 0.26,               // recessed turbine cavity; the rim rings reach ~0.4
+  cheekDiscNormalL: [0.85, -0.06, 0.52], // disc faces mostly sideways (~60 deg off the face axis)
   jawHinge:     JOINTS.jaw.pos,
-  templeL:      [0.82, 1.3, 0.2],
-  templeR:      [-0.82, 1.3, 0.2],
-  // Side blades ("fins"): control points for the LEFT blade, HEAD space.
-  // Mirror X for the right blade.
+  templeL:      [0.74, 1.25, 0.2],
+  templeR:      [-0.74, 1.25, 0.2],
+  // Side blades ("fins"): centre line of the LEFT blade, HEAD space, root -> hook tip.
+  // Stand-off C-shaped horns that frame the face in front view (outer edge
+  // x~1.08), rooted on the upper cranium side, sweeping forward to a hook that
+  // points inward at mouth-corner level. Mirror X for the right blade.
   finCurveL: [
-    [0.62, 1.55, 0.02],
-    [0.88, 1.42, 0.1],
-    [1.06, 1.05, 0.2],
-    [1.08, 0.62, 0.3],
-    [0.96, 0.25, 0.42],
-    [0.76, 0.0, 0.5],
+    [0.64, 1.6, -0.12],
+    [0.88, 1.38, -0.02],
+    [1.03, 1.06, 0.1],
+    [1.08, 0.72, 0.2],
+    [1.01, 0.44, 0.3],
+    [0.85, 0.25, 0.44],
+    [0.64, 0.17, 0.6],
   ],
   // BODY space
   neckBase:     [0, 0.3, -0.02],
   neckTop:      [0, 1.3, -0.05],
-  neckRadius:   0.42,
+  neckRadius:   0.4,
   collarWidth:  1.9,    // half-span to the shoulder tip
   collarY:      0.1,
 };
@@ -89,21 +98,24 @@ export const LANDMARKS = {
 //   zb  : depth behind the section centre (-Z)
 //   n   : superellipse exponent (2 = ellipse, higher = boxier)
 //   zc  : Z offset of the section centre
-// Sampled with Catmull-Rom so the shell is smooth.
+// Sampled with Catmull-Rom so the shell is smooth. This is the FINAL shape
+// (FACE_WARP is off): an egg-shaped dome widest at eye / cheek level, a
+// long skull behind, and a narrower forward muzzle + long chin below.
 // ---------------------------------------------------------------------------
 export const HEAD_PROFILE = [
-  { y: -0.3,  w: 0.2,  zf: 0.18, zb: 0.2,  n: 2.2, zc: 0.4 },
-  { y: -0.15, w: 0.34, zf: 0.26, zb: 0.34, n: 2.4, zc: 0.37 },
-  { y: 0.1,   w: 0.52, zf: 0.4,  zb: 0.55, n: 2.6, zc: 0.28 },
-  { y: 0.4,   w: 0.66, zf: 0.52, zb: 0.74, n: 2.8, zc: 0.18 },
-  { y: 0.75,  w: 0.73, zf: 0.62, zb: 0.9,  n: 2.6, zc: 0.1 },
-  { y: 1.05,  w: 0.79, zf: 0.68, zb: 1.0,  n: 2.4, zc: 0.05 },
-  { y: 1.33,  w: 0.8,  zf: 0.65, zb: 1.04, n: 2.3, zc: 0.0 },
-  { y: 1.55,  w: 0.74, zf: 0.57, zb: 0.98, n: 2.2, zc: -0.04 },
-  { y: 1.72,  w: 0.62, zf: 0.46, zb: 0.84, n: 2.1, zc: -0.07 },
-  { y: 1.86,  w: 0.45, zf: 0.32, zb: 0.62, n: 2.0, zc: -0.1 },
-  { y: 1.96,  w: 0.24, zf: 0.16, zb: 0.33, n: 2.0, zc: -0.12 },
-  { y: 2.0,   w: 0.0,  zf: 0.0,  zb: 0.0,  n: 2.0, zc: -0.12 },
+  { y: -0.32, w: 0.14, zf: 0.1,  zb: 0.16, n: 2.2, zc: 0.5 },
+  { y: -0.2,  w: 0.25, zf: 0.2,  zb: 0.3,  n: 2.4, zc: 0.52 },
+  { y: 0.0,   w: 0.35, zf: 0.28, zb: 0.5,  n: 2.6, zc: 0.52 },
+  { y: 0.24,  w: 0.46, zf: 0.38, zb: 0.72, n: 2.6, zc: 0.48 },
+  { y: 0.47,  w: 0.62, zf: 0.52, zb: 0.86, n: 2.6, zc: 0.32 },
+  { y: 0.72,  w: 0.72, zf: 0.62, zb: 0.95, n: 2.6, zc: 0.17 },
+  { y: 0.95,  w: 0.75, zf: 0.64, zb: 1.0,  n: 2.5, zc: 0.08 },
+  { y: 1.2,   w: 0.73, zf: 0.63, zb: 1.04, n: 2.4, zc: 0.03 },
+  { y: 1.45,  w: 0.67, zf: 0.57, zb: 1.0,  n: 2.3, zc: -0.01 },
+  { y: 1.65,  w: 0.56, zf: 0.47, zb: 0.9,  n: 2.2, zc: -0.05 },
+  { y: 1.8,   w: 0.43, zf: 0.35, zb: 0.72, n: 2.1, zc: -0.08 },
+  { y: 1.9,   w: 0.27, zf: 0.21, zb: 0.47, n: 2.0, zc: -0.11 },
+  { y: 1.96,  w: 0.0,  zf: 0.0,  zb: 0.0,  n: 2.0, zc: -0.12 },
 ];
 
 const HEAD_Y_MIN = HEAD_PROFILE[0].y;
@@ -202,14 +214,14 @@ export const mirrorX = (a) => [-a[0], a[1], a[2]];
 // ---------------------------------------------------------------------------
 const eyeCut = (side) => ({
   type: 'ellipsoid',
-  center: [0.335 * side, 0.93, 0.745],
+  center: [0.335 * side, 0.93, 0.76],
   radii: [LANDMARKS.socketRadii[0], LANDMARKS.socketRadii[1], 0.3],
   rotation: [0, side * 0.35, side * LANDMARKS.socketTilt],
 });
 const discCut = (side) => ({
   type: 'cylinder',
-  center: [0.54 * side, 0.39, 0.51],
-  axis: [0.76 * side, -0.12, 0.64],
+  center: [JOINTS.cheekL.pos[0] * side, JOINTS.cheekL.pos[1], JOINTS.cheekL.pos[2]],
+  axis: [LANDMARKS.cheekDiscNormalL[0] * side, LANDMARKS.cheekDiscNormalL[1], LANDMARKS.cheekDiscNormalL[2]],
   radius: LANDMARKS.cheekDiscRadius * 1.04,
   halfLength: 0.3,
 });
@@ -245,7 +257,7 @@ export function insideCutout(point, names = Object.keys(CUTOUTS), pad = 0) {
 }
 
 // ---------------------------------------------------------------------------
-// FACE_WARP — global reshaping of the head, applied to every head part right
+// FACE_WARP — (disabled) global reshaping of the head, applied to every head part right
 // after it is built (see Ultron.loadPart). Parts author on the shell above;
 // the warp then narrows the lower face (taper) and lengthens the jaw/chin
 // (stretch below pivotY) to match the film silhouette (reference/ultron-film-*.png).
@@ -253,7 +265,9 @@ export function insideCutout(point, names = Object.keys(CUTOUTS), pad = 0) {
 // round and the cheek turbines keep spinning about their own centre.
 // ---------------------------------------------------------------------------
 export const FACE_WARP = {
-  enabled: true,
+  // OFF: HEAD_PROFILE / LANDMARKS now describe the final face directly.
+  // Kept so a global reshape can still be prototyped without touching parts.
+  enabled: false,
   pivotY: 0.34,     // no vertical change above this height
   stretch: 1.55,    // vertical scale of everything well below pivotY
   blend: 0.22,      // height over which the stretch ramps in
