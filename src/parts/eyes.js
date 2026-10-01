@@ -28,8 +28,8 @@ export const meta = {
 // eye-local units (o = outward from the nose, v = up), measured from the face
 // close-up: outer corner raised, inner corner drawn down toward the nose.
 const SOCKET_PTS = [
-  [0.158, 0.05], [0.09, 0.077], [0.0, 0.083], [-0.1, 0.068], [-0.172, 0.034],
-  [-0.2, -0.055], [-0.172, -0.112], [-0.085, -0.118], [0.015, -0.07], [0.105, -0.008],
+  [0.165, 0.045], [0.1, 0.076], [0.02, 0.072], [-0.08, 0.047], [-0.16, 0.012],
+  [-0.205, -0.05], [-0.175, -0.112], [-0.085, -0.122], [0.02, -0.08], [0.11, -0.015],
 ];
 const SOCKET_SCALE = 1.0;
 let _lut = null;
@@ -79,8 +79,8 @@ const LID_C = -0.075;      // lid hinge axis behind the eye joint (local z)
 const LID_R = 0.118;       // lid shell radius about the hinge
 const LID_TH = 0.009;
 const LOOK_C = -0.07;      // gaze pivot behind the lens
-const UP_REST = 0.15;      // upper lid edge angle at rest (rad, + up)
-const LO_REST = -0.4;     // lower lid edge angle at rest
+const UP_C = 0.26;         // upper lid edge angle at the centre of the arch (rad, + up)
+const LO_C = -0.44;        // lower lid edge angle at the centre of the sag
 const MEET = -0.06;        // where the lids meet on a blink
 const LOOK_X = 0.2, LOOK_Y = 0.12;
 const LIGHT_I = 0.01;
@@ -201,19 +201,63 @@ export function build(ctx) {
     return pts;
   };
   const W = 0.205;
-  const xLine = (x0, x1, y = 0, z = 0) => new THREE.LineCurve3(V(x0, y, z), V(x1, y, z));
-  const sweep = (sec, x0 = -W, x1 = W) => geo.sweptSection(xLine(x0, x1), sec, { steps: 2, up: V(0, 1, 0), creaseAngle: THREE.MathUtils.degToRad(35) });
-  const upperLidGeo = sweep(lidSection(UP_REST, 1.45, LID_R - LID_TH, LID_R));
-  const leafGeo = sweep(lidSection(UP_REST + 0.13, UP_REST + 0.42, LID_R, LID_R + 0.005, 8), -0.15, 0.17);
-  const lowerLidGeo = sweep(lidSection(-1.4, LO_REST, LID_R - LID_TH - 0.004, LID_R - 0.004));
-  const rod = (th, r, rad, x0 = -W + 0.01, x1 = W - 0.01) =>
-    geo.sweptSection(xLine(x0, x1, r * Math.sin(th), r * Math.cos(th)), geo.roundedSection(rad, rad, 2, 10), { steps: 2, up: V(0, 1, 0) });
-  const upperEdgeGeo = rod(UP_REST + 0.03, LID_R - LID_TH * 0.5, 0.0058);
-  const lowerEdgeGeo = rod(LO_REST - 0.03, LID_R - 0.004 - LID_TH * 0.5, 0.0052);
-  const lowerRibGeo = rod(LO_REST - 0.16, LID_R - 0.002, 0.0032, -W + 0.04, W - 0.04);
-  // layered shutter look: fine horizontal ribs across the upper lid
-  const lowerRibGeos = [-0.2, -0.36].map((d) => rod(LO_REST + d, LID_R - 0.0035, 0.0024, -W + 0.05, W - 0.05));
-  const upperRibGeos = [0.2, 0.36, 0.55].map((d, i) => rod(UP_REST + d, LID_R + 0.0005, 0.0026, -W + 0.03 + i * 0.02, W - 0.03 - i * 0.015));
+  // CURVED lid edges (face close-up): the upper edge arches over the iris
+  // (almond), peaking a little toward the outer corner; the lower edge sags.
+  // u = outward coordinate (-1 inner corner .. +1 outer corner).
+  const thUp = (u) => UP_C - 0.27 * (u - 0.18) * (u - 0.18) + 0.05 * u;
+  const thLo = (u) => LO_C + 0.34 * u * u - 0.03 * u;
+  /** thick lid shell between theta edge(x) and a fixed far angle, swept across x */
+  const lidShell = (side, edgeFn, far, r0, r1, x0 = -W, x1 = W, nx = 28, nt = 12) => {
+    const pos = [], uv = [], idx = [];
+    const rows = [];
+    const at = (x, th, r) => [x, r * Math.sin(th), r * Math.cos(th)];
+    // grid: outer surface (r1) then inner (r0); i = x, j = theta (edge -> far)
+    for (const r of [r1, r0]) {
+      for (let i = 0; i <= nx; i++) {
+        const x = x0 + ((x1 - x0) * i) / nx;
+        const e = edgeFn((side * x) / W);
+        for (let j = 0; j <= nt; j++) {
+          const f = typeof far === 'function' ? far((side * x) / W) : far;
+          const th = e + ((f - e) * j) / nt;
+          pos.push(...at(x, th, r));
+          uv.push(x * 1.0, th * r);
+        }
+      }
+    }
+    const G = (k, i, j) => k * (nx + 1) * (nt + 1) + i * (nt + 1) + j;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < nt; j++) {
+      idx.push(G(0, i, j), G(0, i + 1, j), G(0, i, j + 1), G(0, i + 1, j), G(0, i + 1, j + 1), G(0, i, j + 1));
+      idx.push(G(1, i, j), G(1, i, j + 1), G(1, i + 1, j), G(1, i + 1, j), G(1, i, j + 1), G(1, i + 1, j + 1));
+    }
+    // edge wall (j = 0) joining outer and inner
+    for (let i = 0; i < nx; i++) idx.push(G(0, i, 0), G(1, i, 0), G(0, i + 1, 0), G(0, i + 1, 0), G(1, i, 0), G(1, i + 1, 0));
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    g.computeBoundingSphere();
+    return g;
+  };
+  /** rod following a curved lid edge: theta = edgeFn(u) + d at radius r */
+  const edgeRod = (side, edgeFn, d, r, rad, x0 = -W + 0.01, x1 = W - 0.01) => {
+    const pts = [];
+    for (let i = 0; i <= 24; i++) {
+      const x = x0 + ((x1 - x0) * i) / 24;
+      const th = edgeFn((side * x) / W) + d;
+      pts.push(V(x, r * Math.sin(th), r * Math.cos(th)));
+    }
+    return geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(rad, rad, 2, 10), { steps: 40, up: V(0, 0, 1) });
+  };
+  const lidGeos = (side) => ({
+    upper: lidShell(side, thUp, 1.45, LID_R - LID_TH, LID_R),
+    leaf: lidShell(side, (u) => thUp(u) + 0.13, (u) => thUp(u) + 0.42, LID_R, LID_R + 0.005, -0.15, 0.17, 18, 2),
+    lower: lidShell(side, thLo, -1.4, LID_R - LID_TH - 0.004, LID_R - 0.004),
+    upperEdge: edgeRod(side, thUp, 0.03, LID_R - LID_TH * 0.5, 0.0058),
+    lowerEdge: edgeRod(side, thLo, -0.03, LID_R - 0.004 - LID_TH * 0.5, 0.0052),
+    lowerRibs: [-0.16, -0.32, -0.48].map((d, i) => edgeRod(side, thLo, d, LID_R - 0.002 - (i ? 0.0015 : 0), i ? 0.0024 : 0.0032, -W + 0.04 + i * 0.01, W - 0.04 - i * 0.01)),
+    upperRibs: [0.2, 0.36, 0.55].map((d, i) => edgeRod(side, thUp, d, LID_R + 0.0005, 0.0026, -W + 0.03 + i * 0.02, W - 0.03 - i * 0.015)),
+  });
 
   // ------------------------------------------------------------- assemble
   const sides = {};
@@ -276,14 +320,14 @@ export function build(ctx) {
     lowerPivot.name = `eyes.lidLowerPivot.${key}`;
     lowerPivot.position.set(0, 0, LID_C);
     lidFrame.add(upperPivot, lowerPivot);
-    upperPivot.add(ctx.mesh(upperLidGeo, lidMat, `eyes.lidUpper.${key}`));
-    upperPivot.add(ctx.mesh(leafGeo, leafMat, `eyes.lidUpperLeaf.${key}`));
-    upperPivot.add(ctx.mesh(upperEdgeGeo, edgeMat, `eyes.lidUpperEdge.${key}`));
-    lowerPivot.add(ctx.mesh(lowerLidGeo, lidMat, `eyes.lidLower.${key}`));
-    lowerPivot.add(ctx.mesh(lowerEdgeGeo, edgeMat, `eyes.lidLowerEdge.${key}`));
-    lowerPivot.add(ctx.mesh(lowerRibGeo, ringMat, `eyes.lidLowerRib.${key}`));
-    lowerRibGeos.forEach((g, i) => lowerPivot.add(ctx.mesh(g, ringMat, `eyes.lidLowerRib${i + 1}.${key}`)));
-    upperRibGeos.forEach((g, i) => upperPivot.add(ctx.mesh(g, ringMat, `eyes.lidUpperRib${i}.${key}`)));
+    const LG = lidGeos(side);
+    upperPivot.add(ctx.mesh(LG.upper, lidMat, `eyes.lidUpper.${key}`));
+    upperPivot.add(ctx.mesh(LG.leaf, leafMat, `eyes.lidUpperLeaf.${key}`));
+    upperPivot.add(ctx.mesh(LG.upperEdge, edgeMat, `eyes.lidUpperEdge.${key}`));
+    lowerPivot.add(ctx.mesh(LG.lower, lidMat, `eyes.lidLower.${key}`));
+    lowerPivot.add(ctx.mesh(LG.lowerEdge, edgeMat, `eyes.lidLowerEdge.${key}`));
+    LG.lowerRibs.forEach((g, i) => lowerPivot.add(ctx.mesh(g, ringMat, i ? `eyes.lidLowerRib${i}.${key}` : `eyes.lidLowerRib.${key}`)));
+    LG.upperRibs.forEach((g, i) => upperPivot.add(ctx.mesh(g, ringMat, `eyes.lidUpperRib${i}.${key}`)));
 
     const look = new THREE.Group();
     look.name = `eyes.lookPivot.${key}`;
@@ -319,10 +363,11 @@ export function build(ctx) {
       const blink = clamp01((p.blink || 0) + (key === 'L' ? Math.max(0, wink) : Math.max(0, -wink)) + extra.blink);
       const squint = clamp01(p.squint || 0);
       // rotation.x > 0 tips +z toward -y: the upper lid swings down
-      const up = UP_REST - squint * 0.18;
-      const lo = LO_REST + squint * 0.22;
-      s.upperPivot.rotation.x = (UP_REST - (up + (MEET - up) * blink));
-      s.lowerPivot.rotation.x = -((lo + (MEET - 0.01 - lo) * blink) - LO_REST);
+      // centre of the curved edges travels to MEET on a blink
+      const up = UP_C - squint * 0.18;
+      const lo = LO_C + squint * 0.22;
+      s.upperPivot.rotation.x = (UP_C - (up + (MEET - up) * blink));
+      s.lowerPivot.rotation.x = -((lo + (MEET - 0.01 - lo) * blink) - LO_C);
       const lx = THREE.MathUtils.clamp((p.lookX || 0) + extra.lx, -1, 1);
       const ly = THREE.MathUtils.clamp((p.lookY || 0) + extra.ly, -1, 1);
       s.look.rotation.set(-ly * LOOK_Y, s.side * lx * LOOK_X, 0);
