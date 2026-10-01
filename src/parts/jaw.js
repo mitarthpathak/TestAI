@@ -1,28 +1,28 @@
 /**
- * PART: jaw — forward-projecting muzzle (broad V chin plate + step plate,
- * grooves) + round chin button, layered mandible bands that wrap the
- * cheek discs, the ramus plates running back to the hinge, the V jaw line,
- * the under-jaw closure and the mouth interior (dark cavity + metal teeth).
+ * PART: jaw — the forward muzzle below the upper lip.
  *
- * Joint: jaw (hinge at head-space (0, 0.46, 0.02), rotation about X).
- * Authoring space: HEAD for everything.
+ * Authored directly on the final head shell (FACE_WARP off), HEAD space.
+ * Joint: jaw (hinge (0, 0.4, 0.04), rotation about X). Everything here rides
+ * the jaw except the mouth interior back wall (static on the head).
  *
- * Rig notes
- *  - `open` rotates the jaw joint and glides it slightly down / forward (like a
- *    real TMJ), so the chin drops instead of sinking into the neck.
- *  - The mandible plates are concentric bands around the cheek disc. Each band
- *    sits on its own "flex" pivot that follows only a fraction `k` of the jaw
- *    joint's motion (bands next to the static cheek disc move least). Bands are
- *    layered (inner band on top, outer bands tucked underneath) so opening the
- *    mouth slides plates over each other instead of tearing holes.
- *  - The upper teeth + the mouth back wall live on the HEAD (static); the lower
- *    teeth ride the jaw.
+ * Sub-objects
+ *   jaw.carrier            horizontal lower-lip carrier plate under the lips
+ *   jaw.column             central vertical plate from the carrier to the chin
+ *   jaw.column.rib.L/R     bright vertical ribs on the column (grille look)
+ *   jaw.column.seam        dark groove between carrier / column / chin
+ *   jaw.muzzle.L/R         flanking muzzle plates beside the column (mouth corner -> chin)
+ *   jaw.chin               long rounded chin cup, curls under the head
+ *   jaw.chin.step          darker, wider step plate behind the chin cup
+ *   jaw.button.*           chin button: seat, stepped ring, domed face, slot, on jaw.button.pivot
+ *   jaw.side.{A,B,C}.L/R   layered horizontal jaw bands back under the cheek rings
+ *   jaw.line.L/R           bright rail along the jaw line
+ *   jaw.under.L/R          under-jaw plates sloping in toward the neck
+ *   jaw.mouth.back         dark mouth cavity (on the head)
+ *   jaw.mouth.floor        dark floor of the mouth (on the jaw)
+ *   flex pivots jaw.flex.{A,B} follow a fraction of the hinge so the upper
+ *   bands (next to the static cheeks) move less than the chin.
  *
- * Sub-objects: jaw.chin, jaw.chin.step, jaw.chin.{groove,ridge,vgroove}.L/R,
- * jaw.chin.groove.top, jaw.button(.rim/.arch/.seat/.pivot), jaw.detail.groove*.L/R,
- * jaw.band.{A,B,C,D}.L/R (= mandible layers), jaw.ramus.L/R, jaw.hinge.L/R,
- * jaw.line.L/R, jaw.under.L/R, jaw.underCap, jaw.mouth.back,
- * jaw.teeth.upper / jaw.teeth.lower, flex pivots jaw.flex.*
+ * Params: open (hinge), shift (sideways), clench, button (button spin).
  */
 export const meta = {
   id: 'jaw',
@@ -34,130 +34,33 @@ export function build(ctx) {
   const V3 = THREE.Vector3;
   const { lerp, smoothstep: sstep, clamp } = THREE.MathUtils;
   const L = A.LANDMARKS;
-  const { headSection, headSurface, headNormal } = A;
+  const { headSection, headSurface, headNormal, headFrontZ } = A;
 
-  const root = ctx.space('jaw', 'head');      // moves with the jaw joint
-  const headRoot = ctx.space('head', 'head'); // static mouth interior
+  const root = ctx.space('jaw', 'head');
+  const headRoot = ctx.space('head', 'head');
   headRoot.name = 'jaw@head';
 
   // ------------------------------------------------------------ materials
   const mat = {
-    column: M.get('chrome', { roughness: 0.2, panel: 7, seed: 61, lineWidth: 0.003, lineDepth: 0.6 }),
-    bandA: M.get('chrome', { roughness: 0.22, panel: 6, seed: 62, lineWidth: 0.0035 }),
-    bandB: M.get('gunmetal', { roughness: 0.3, panel: 5.5, seed: 63, lineWidth: 0.0035 }),
-    bandC: M.get('chrome', { roughness: 0.25, panel: 5.2, seed: 64, lineWidth: 0.0035 }),
-    bandD: M.get('gunmetal', { roughness: 0.32, panel: 4.6, seed: 65, lineWidth: 0.0035 }),
-    ramus: M.get('gunmetal', { roughness: 0.34, panel: 4.4, seed: 68, lineWidth: 0.004 }),
+    column: M.get('chrome', { roughness: 0.2, panel: 7, seed: 61, lineWidth: 0.003, lineDepth: 0.7 }),
+    carrier: M.get('chrome', { roughness: 0.18, panel: 8, seed: 69, lineWidth: 0.003, lineDepth: 0.6 }),
+    chin: M.get('chrome', { roughness: 0.22, panel: 5, seed: 67, lineWidth: 0.0035, lineDepth: 0.7 }),
+    muzzle: M.get('gunmetal', { roughness: 0.34, panel: 6.5, seed: 62, lineWidth: 0.0035 }),
+    sideA: M.get('chrome', { roughness: 0.36, panel: 6, seed: 63, lineWidth: 0.0035 }),
+    sideB: M.get('chrome', { roughness: 0.42, color: 0x868d95, panel: 5.5, seed: 64, lineWidth: 0.0035 }),
+    sideC: M.get('chrome', { roughness: 0.38, panel: 5, seed: 65, lineWidth: 0.0035 }),
     under: M.get('gunmetal', { roughness: 0.42, panel: 4, seed: 66, lineWidth: 0.004 }),
-    bright: M.get('chrome', { roughness: 0.14 }),
-    buttonFace: M.get('chrome', { roughness: 0.24 }),
-    gun: M.get('gunmetal', { roughness: 0.3 }),
+    step: M.get('gunmetal', { roughness: 0.36 }),
+    base: M.get('chrome', { roughness: 0.46, color: 0x7a8189, panel: 6, seed: 70, lineWidth: 0.003 }),
+    bright: M.get('chrome', { roughness: 0.12 }),
+    buttonFace: M.get('chrome', { roughness: 0.22 }),
     dark: M.get('darkMetal'),
     cavity: M.get('cavity'),
   };
 
-  // ------------------------------------------------------------ head-surface maths
-  /** inverse of headSurface: angle u of a point near the shell */
-  const uOf = (x, y, z) => {
-    const s = headSection(y);
-    const d = z >= s.zc ? s.zf : s.zb;
-    const su = Math.sign(x) * Math.pow(Math.abs(x) / s.w, s.n / 2);
-    const cu = Math.sign(z - s.zc) * Math.pow(Math.abs(z - s.zc) / d, s.n / 2);
-    return Math.atan2(su, cu);
-  };
+  // ------------------------------------------------------------ shared helpers
   const _t = new V3();
-
-  // ------------------------------------------------------------ cheek-disc polar frame (LEFT side)
-  // (phi, rho) = angle / radial distance around the cheek-disc AXIS. A point
-  // is found by walking along a line parallel to the axis until it meets the
-  // shell, so rings of constant rho are exactly concentric with the disc and
-  // its guard band from any view.
-  const C = new V3().fromArray(L.cheekDiscL);
-  const dn = new V3().fromArray(L.cheekDiscNormalL).normalize();
-  const e1 = new V3(0, 1, 0).cross(dn).normalize(); // outward / back
-  const e2 = new V3().crossVectors(dn, e1).normalize(); // up
-  const levelAt = (x, y, z) => {
-    const s = headSection(y);
-    const d = z >= s.zc ? s.zf : s.zb;
-    return Math.pow(Math.abs(x) / s.w, s.n) + Math.pow(Math.abs(z - s.zc) / d, s.n) - 1;
-  };
-  const _q = new V3();
-  const F = (t) => levelAt(_q.x + dn.x * t, _q.y + dn.y * t, _q.z + dn.z * t);
-  let tWarm = 0;
-  /** (phi, rho) around the disc -> [u, y] on the head shell; returns null when the line misses */
-  const discUY = (phi, r, out) => {
-    _q.copy(C).addScaledVector(e1, r * Math.cos(phi)).addScaledVector(e2, r * Math.sin(phi));
-    let t = tWarm, ok = false;
-    for (let i = 0; i < 12; i++) {
-      const f = F(t);
-      if (Math.abs(f) < 1e-6) { ok = true; break; }
-      const df = (F(t + 1e-4) - f) / 1e-4;
-      if (Math.abs(df) < 1e-5) break;
-      t -= clamp(f / df, -0.08, 0.08);
-      if (Math.abs(t) > 0.45) break;
-    }
-    if (!ok && Math.abs(F(t)) < 1e-4) ok = true;
-    if (!ok) {
-      // bracket search for the nearest crossing
-      const s0 = Math.sign(F(0));
-      let lo = 0, hi = 0, found = false;
-      for (let k = 1; k <= 36 && !found; k++) {
-        for (const sg of [1, -1]) {
-          const tt = sg * k * 0.012;
-          if (Math.sign(F(tt)) !== s0) { lo = sg * (k - 1) * 0.012; hi = tt; found = true; break; }
-        }
-      }
-      if (!found) return null;
-      for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (Math.sign(F(m)) === s0) lo = m; else hi = m; }
-      t = (lo + hi) / 2;
-    }
-    tWarm = t;
-    const x = _q.x + dn.x * t, y = _q.y + dn.y * t, z = _q.z + dn.z * t;
-    out[0] = uOf(x, y, z);
-    out[1] = y;
-    return out;
-  };
-
-  // ------------------------------------------------------------ layout curves (LEFT side, u >= 0)
-  const GROOVE_X = 0.104;   // chin column half width + seam
-  const U_BAND = 1.78;      // bands stop here, the ramus continues to the back
-  const U_BACK = 2.3;
-  // jaw line: lower edge of the mandible plates, from the chin corner back to the neck
-  const jawPts = [[0.22, -0.262], [0.5, -0.232], [0.85, -0.168], [1.2, -0.085], [1.55, -0.005], [1.9, 0.07], [2.32, 0.135]];
-  const jawTable = new THREE.SplineCurve(jawPts.map(([u, y]) => new THREE.Vector2(u, y))).getSpacedPoints(160);
-  const jawLineY = (u) => {
-    if (u <= jawTable[0].x) return jawTable[0].y;
-    for (let i = 1; i < jawTable.length; i++) {
-      if (jawTable[i].x >= u) {
-        const a = jawTable[i - 1], b = jawTable[i];
-        return lerp(a.y, b.y, (u - a.x) / (b.x - a.x || 1));
-      }
-    }
-    return jawTable[jawTable.length - 1].y;
-  };
-  // top limit: under the lower lip in front of the mouth, lips band beside it, cranium plates behind
-  const topY = (x, u) => {
-    const mouth = lerp(0.1, 0.232, sstep(x, 0.2, 0.25));
-    return lerp(mouth, 0.352, sstep(u, 1.05, 1.3));
-  };
-  const _P = new V3();
-  const allowedUY = (u, y) => {
-    if (u > U_BAND || u < 0) return false;
-    headSurface(u, y, _P);
-    if (_P.x < GROOVE_X) return false;
-    if (y < jawLineY(u)) return false;
-    if (y > topY(_P.x, u)) return false;
-    return true;
-  };
-  const _uy = [0, 0];
-  const allowedDisc = (phi, r) => discUY(phi, r, _uy) !== null && allowedUY(_uy[0], _uy[1]);
-
-  // ------------------------------------------------------------ generic custom-surface plate
-  /**
-   * Thick bevelled plate over an arbitrary parametric patch S(a, b) (outer
-   * surface). `out(a, b)` gives a rough outward direction used to orient the
-   * normals and the winding.
-   */
+  /** Thick bevelled plate over an arbitrary parametric patch S(a, b, target). */
   function plate(o) {
     const { a0, a1, b0, b1 } = o;
     let flip = false;
@@ -181,8 +84,8 @@ export function build(ctx) {
     if (pa.cross(pb).dot(o.out(am, bm)) < 0) flip = true;
     return geo.shellPatch({
       u0: a0, u1: a1, y0: b0, y1: b1, surface: S, normal: N,
-      offset: 0, thickness: o.thickness ?? 0.045, bevel: o.bevel ?? 0.012, gap: o.gap ?? 0,
-      segU: o.segU ?? 32, segV: o.segV ?? 12,
+      offset: 0, thickness: o.thickness ?? 0.04, bevel: o.bevel ?? 0.01, gap: o.gap ?? 0,
+      segU: o.segU ?? 24, segV: o.segV ?? 16,
     });
   }
   const pair = (g, material, name, parent) => {
@@ -191,8 +94,185 @@ export function build(ctx) {
     parent.add(l, r);
     return [l, r];
   };
+  const tube = (pts, w, h, material, name, parent, up = new V3(0, 0, 1), steps) => {
+    const g = geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(w, h, 3, 10), {
+      steps: steps ?? Math.max(10, pts.length * 3), up: typeof up === 'function' ? up : () => up,
+    });
+    const m = ctx.mesh(g, material, name);
+    parent.add(m);
+    return m;
+  };
 
-  // ------------------------------------------------------------ flex pivots
+  // ------------------------------------------------------------ muzzle front surface
+  // The lower face projects forward like a muzzle: the shell front plus a
+  // bulge that is strongest on the centre line between mouth and chin.
+  const MOUTH_Y = L.mouthCenter[1];
+  const bulge = (x, y) => {
+    const fx = Math.exp(-Math.pow(Math.abs(x) / 0.27, 3));
+    const fy = sstep(y, -0.3, -0.12) * (1 - 0.35 * sstep(y, 0.2, 0.32));
+    return 0.032 * fx * fy;
+  };
+  /** front-projected point on the muzzle at (x, y) with extra offset n along +Z-ish normal */
+  const muzZ = (x, y) => {
+    const z = headFrontZ(x, y);
+    if (z == null) {
+      const s = headSection(y);
+      return s.zc;
+    }
+    return z + bulge(x, y);
+  };
+  const frontOut = (x, y) => {
+    const h = 1e-3;
+    const dzx = (muzZ(x + h, y) - muzZ(x - h, y)) / (2 * h);
+    const dzy = (muzZ(x, y + h) - muzZ(x, y - h)) / (2 * h);
+    return new V3(-dzx, -dzy, 1).normalize();
+  };
+  const frontPt = (x, y, n, t = new V3()) => {
+    const o = frontOut(x, y);
+    return t.set(x, y, muzZ(x, y)).addScaledVector(o, n);
+  };
+
+  // ------------------------------------------------------------ lower-lip carrier
+  // wide horizontal plate directly under the lower lip (the lips sit on it)
+  const CARRIER_TOP = MOUTH_Y - 0.03;
+  const CARRIER_BOT = MOUTH_Y - 0.115;
+  {
+    const xHalf = (y) => lerp(0.2, 0.275, sstep(y, CARRIER_BOT, CARRIER_TOP));
+    const S = (a, b, t) => {
+      const y = lerp(CARRIER_BOT, CARRIER_TOP, b);
+      const x = a * xHalf(y);
+      const roll = Math.pow(Math.abs(a), 4) * 0.02; // ends roll back into the face
+      return frontPt(x, y, 0.016 - roll, t);
+    };
+    const out = (a, b) => frontOut(a * 0.25, lerp(CARRIER_BOT, CARRIER_TOP, b));
+    root.add(ctx.mesh(plate({ a0: -1, a1: 1, b0: 0, b1: 1, S, out, thickness: 0.04, bevel: 0.012, segU: 40, segV: 10 }), mat.carrier, 'jaw.carrier'));
+  }
+
+  // ------------------------------------------------------------ central column
+  const COL_TOP = CARRIER_BOT + 0.004;
+  const COL_BOT = -0.07;
+  const colW = (y) => lerp(0.085, 0.105, sstep(y, COL_BOT, COL_TOP));
+  {
+    const S = (a, b, t) => {
+      const y = lerp(COL_BOT, COL_TOP, b);
+      const x = a * colW(y);
+      return frontPt(x, y, 0.02 - 0.012 * Math.pow(Math.abs(a), 3), t);
+    };
+    const out = (a, b) => frontOut(a * colW(0), lerp(COL_BOT, COL_TOP, b));
+    root.add(ctx.mesh(plate({ a0: -1, a1: 1, b0: 0, b1: 1, S, out, thickness: 0.045, bevel: 0.012, segU: 20, segV: 16 }), mat.column, 'jaw.column'));
+    // vertical ribs (grille) on the column
+    for (const side of [1, -1]) {
+      const pts = [];
+      for (let i = 0; i <= 8; i++) {
+        const y = lerp(COL_BOT + 0.03, COL_TOP - 0.012, i / 8);
+        pts.push(frontPt(side * colW(y) * 0.45, y, 0.026));
+      }
+      tube(pts, 0.009, 0.006, mat.bright, `jaw.column.rib.${side > 0 ? 'L' : 'R'}`, root, new V3(0, 0, 1));
+    }
+    // dark seam groove around the column top
+    const sp = [];
+    for (let i = 0; i <= 12; i++) {
+      const x = lerp(-0.27, 0.27, i / 12);
+      sp.push(frontPt(x * 0.97, CARRIER_BOT - 0.002 + 0.0, 0.004));
+    }
+    tube(sp, 0.008, 0.006, mat.dark, 'jaw.column.seam', root);
+  }
+
+  // ------------------------------------------------------------ flanking muzzle plates (mouth corner -> chin)
+  {
+    const yb = -0.13, yt = CARRIER_BOT + 0.01;
+    const xIn = (y) => colW(y) + 0.006;
+    const xOut = (y) => lerp(0.16, 0.31, sstep(y, yb - 0.04, yt));
+    const S = (a, b, t) => {
+      const y = lerp(yb, yt, b);
+      const x = lerp(xIn(y), xOut(y), a);
+      // rounded: falls back toward the shell at the outer edge
+      return frontPt(x, y, 0.011 - 0.012 * Math.pow(a, 2.5), t);
+    };
+    const out = (a, b) => frontOut(lerp(0.12, 0.25, a), lerp(yb, yt, b));
+    pair(plate({ a0: 0, a1: 1, b0: 0, b1: 1, S, out, thickness: 0.04, bevel: 0.01, gap: 0.003, segU: 16, segV: 18 }), mat.muzzle, 'jaw.muzzle', root);
+    // bright seam rail along the outer edge of the muzzle plates
+    for (const side of [1, -1]) {
+      const pts = [];
+      for (let i = 0; i <= 12; i++) {
+        const y = lerp(yb + 0.02, yt, i / 12);
+        pts.push(frontPt(side * (xOut(y) - 0.012), y, 0.004));
+      }
+      tube(pts, 0.007, 0.007, mat.bright, `jaw.muzzle.rail.${side > 0 ? 'L' : 'R'}`, root, new V3(side * 0.7, 0, 0.7).normalize());
+    }
+  }
+
+  // ------------------------------------------------------------ chin cup (long rounded chin that curls under)
+  // spine in the (y, z) plane: from just below the column down and under the head
+  // the front follows the muzzle surface (flush with the column), then curls under
+  const spinePts = [];
+  for (const y of [-0.03, -0.09, -0.15, -0.21]) spinePts.push([y, muzZ(0, y) + 0.016]);
+  spinePts.push([-0.265, 0.675], [-0.31, 0.625], [-0.342, 0.56], [-0.36, 0.49], [-0.368, 0.42]);
+  spinePts.reverse();
+  const spine = new THREE.SplineCurve(spinePts.map(([y, z]) => new THREE.Vector2(z, y)));
+  const _sp = new THREE.Vector2(), _tg = new THREE.Vector2();
+  const spineFrame = (b) => {
+    spine.getPointAt(clamp(b, 0, 1), _sp);
+    spine.getTangentAt(clamp(b, 0, 1), _tg);
+    return { z: _sp.x, y: _sp.y, nz: _tg.y, ny: -_tg.x };
+  };
+  const chinW = (b) => lerp(0.1, 0.19, sstep(b, 0.05, 0.75)) + 0.03 * sstep(b, 0.7, 1);
+  const makeChin = (wScale, sink) => (a, b, t) => {
+    const f = spineFrame(b);
+    const w = chinW(b) * wScale;
+    const x = a * w;
+    // rounded cross-section: the sides fall back
+    const drop = (1 - Math.sqrt(Math.max(0, 1 - a * a * 0.92))) * (0.03 + 0.08 * w);
+    return t.set(x, f.y - f.ny * (drop + sink), f.z - f.nz * (drop + sink));
+  };
+  const chinOut = (a, b) => { const f = spineFrame(b); return new V3(a * 0.6, f.ny, f.nz).normalize(); };
+  const chinS = makeChin(1, 0);
+  root.add(ctx.mesh(plate({ a0: -1, a1: 1, b0: 0, b1: 1, S: chinS, out: chinOut, thickness: 0.05, bevel: 0.014, segU: 34, segV: 36 }), mat.chin, 'jaw.chin'));
+  root.add(ctx.mesh(plate({ a0: -1, a1: 1, b0: 0.0, b1: 0.97, S: makeChin(1.1, 0.016), out: chinOut, thickness: 0.04, bevel: 0.01, segU: 34, segV: 28 }), mat.step, 'jaw.chin.step'));
+  // dark seam where the chin meets the column / muzzle plates
+  {
+    const pts = [];
+    for (let i = 0; i <= 16; i++) {
+      const a = lerp(-1, 1, i / 16);
+      const p = chinS(a * 0.98, 1, new V3());
+      pts.push(p.add(new V3(0, 0.004, 0.004)));
+    }
+    tube(pts, 0.007, 0.006, mat.dark, 'jaw.chin.seam', root);
+  }
+
+  // ------------------------------------------------------------ chin button
+  const btnPivot = new THREE.Group();
+  btnPivot.name = 'jaw.button.pivot';
+  const btnSpin = new THREE.Group();
+  btnSpin.name = 'jaw.button.spin';
+  {
+    let bb = 0.6;
+    for (let i = 0; i < 40; i++) { const f = spineFrame(bb); bb = clamp(bb + (L.chinButton[1] - f.y) * 1.2, 0, 1); }
+    const f = spineFrame(bb);
+    const p = chinS(0, bb, new V3());
+    btnPivot.position.copy(p).add(new V3(0, f.ny, f.nz).multiplyScalar(0.004));
+    geo.faceDirection(btnPivot, new V3(0, f.ny, f.nz).normalize());
+    const R = 0.085;
+    const seat = ctx.mesh(geo.ringStack([[R * 1.62, 0.004], [R * 1.55, 0.0], [R * 1.48, -0.012], [0, -0.012]], 64), mat.dark, 'jaw.button.seat');
+    const ring = ctx.mesh(geo.ringStack([
+      [R * 1.02, 0.008], [R * 1.06, 0.022], [R * 1.12, 0.028], [R * 1.2, 0.026], [R * 1.25, 0.016], [R * 1.32, 0.013], [R * 1.4, 0.012], [R * 1.45, 0.002], [R * 1.47, -0.01],
+    ], 72), mat.bright, 'jaw.button.ring');
+    const face = ctx.mesh(geo.ringStack([
+      [0, 0.024], [R * 0.4, 0.023], [R * 0.7, 0.02], [R * 0.9, 0.016], [R * 0.98, 0.01], [R, 0.0],
+    ], 56), mat.buttonFace, 'jaw.button');
+    // slot detail on the face
+    const archPts = [];
+    for (let i = 0; i <= 16; i++) {
+      const a = lerp(Math.PI * 0.15, Math.PI * 0.85, i / 16);
+      archPts.push(new V3(Math.cos(a) * R * 0.45, -R * 0.25 + Math.sin(a) * R * 0.3, 0.022 - 0.002 * Math.abs(Math.cos(a))));
+    }
+    const arch = ctx.mesh(geo.sweptSection(new THREE.CatmullRomCurve3(archPts), geo.roundedSection(0.006, 0.005, 2, 8), { steps: 24, up: () => new V3(0, 0, 1) }), mat.dark, 'jaw.button.slot');
+    btnSpin.add(face, arch);
+    btnPivot.add(seat, ring, btnSpin);
+  }
+  root.add(btnPivot);
+
+  // ------------------------------------------------------------ flex pivots (for the side bands)
   const hinge = new V3().fromArray(A.JOINTS.jaw.pos);
   const flexGroups = [];
   const flex = (name, k) => {
@@ -203,290 +283,128 @@ export function build(ctx) {
     flexGroups.push(g);
     return g;
   };
-  const fxRamus = flex('jaw.flex.ramus', 0.2);
-  const fxA = flex('jaw.flex.A', 0.3);
-  const fxB = flex('jaw.flex.B', 0.55);
-  const fxC = flex('jaw.flex.C', 0.8);
+  const fxA = flex('jaw.flex.A', 0.35);
+  const fxB = flex('jaw.flex.B', 0.7);
 
-  // ------------------------------------------------------------ mandible bands (concentric around the disc)
-  const BANDS = [
-    { key: 'A', r0: 0.3, r1: 0.415, off: 0.018, grp: fxA, m: mat.bandA, phiMax: -0.85 },
-    { key: 'B', r0: 0.39, r1: 0.515, off: 0.012, grp: fxB, m: mat.bandB, phiMax: -0.85 },
-    { key: 'C', r0: 0.49, r1: 0.615, off: 0.006, grp: fxC, m: mat.bandC, phiMax: -0.85 },
-    { key: 'D', r0: 0.59, r1: 1.1, off: 0.0, grp: root, m: mat.bandD, phiMax: -0.85 },
-  ];
-  for (const B of BANDS) {
-    // outer radius per phi, clipped by the layout boundary
-    const NS = 72;
-    const table = [];
-    for (let i = 0; i <= NS; i++) {
-      const phi = lerp(-3.1, B.phiMax, i / NS);
-      let rOut = B.r0;
-      if (allowedDisc(phi, B.r0 + 0.004)) {
-        let r = B.r0;
-        const step = 0.01;
-        while (r + step <= B.r1 && allowedDisc(phi, r + step)) r += step;
-        let lo = r, hi = Math.min(B.r1, r + step);
-        if (hi > lo && !allowedDisc(phi, hi)) {
-          for (let k = 0; k < 10; k++) { const m = (lo + hi) / 2; if (allowedDisc(phi, m)) lo = m; else hi = m; }
-          r = lo;
-        } else r = hi;
-        rOut = r;
-      }
-      table.push([phi, rOut]);
-    }
-    // every contiguous run with a usable width becomes one plate
-    const minW = 0.028;
-    const runs = [];
-    let cur = -1;
-    for (let i = 0; i <= NS + 1; i++) {
-      const ok = i <= NS && table[i][1] - B.r0 >= minW;
-      if (ok && cur < 0) cur = i;
-      if (!ok && cur >= 0) { if (i - 1 - cur >= 2) runs.push(table.slice(cur, i)); cur = -1; }
-    }
-    runs.forEach((tb, ri) => {
-      const phiA = tb[0][0], phiB = tb[tb.length - 1][0];
-      const rOutAt = (phi) => {
-        const f = clamp((phi - phiA) / (phiB - phiA), 0, 1) * (tb.length - 1);
-        const i = Math.min(tb.length - 2, Math.floor(f));
-        return lerp(tb[i][1], tb[i + 1][1], f - i);
-      };
-      const S = (phi, b, t) => {
-        discUY(phi, lerp(B.r0, rOutAt(phi), b), _uy);
-        headSurface(_uy[0], _uy[1], t);
-        headNormal(_uy[0], _uy[1], _t);
-        const crown = 0.003 * Math.sin(Math.PI * clamp(b, 0, 1)); // gentle pillow across the band
-        return t.addScaledVector(_t, B.off + crown);
-      };
-      const out = (phi, b) => {
-        discUY(phi, lerp(B.r0, rOutAt(phi), b), _uy);
-        return headNormal(_uy[0], _uy[1], new V3());
-      };
-      const segU = Math.max(8, Math.round(56 * (phiB - phiA) / 2.4));
-      const g = plate({ a0: phiA, a1: phiB, b0: 0, b1: 1, S, out, thickness: 0.032, bevel: 0.006, gap: 0.002, segU, segV: 8 });
-      pair(g, B.m, `jaw.band.${B.key}${ri ? ri : ''}`, B.grp);
-    });
-  }
-
-  // ------------------------------------------------------------ ramus: rear mandible plate back to the hinge
+  // ------------------------------------------------------------ jaw sides: layered horizontal bands
+  // (u, y) on the head shell. jaw line = lower edge, top = under the cheek rings.
+  const U0 = 0.55, U1 = 1.9;
+  const tabY = (pts) => {
+    const c = new THREE.SplineCurve(pts.map(([u, y]) => new THREE.Vector2(u, y))).getSpacedPoints(120);
+    return (u) => {
+      if (u <= c[0].x) return c[0].y;
+      for (let i = 1; i < c.length; i++) if (c[i].x >= u) { const a = c[i - 1], b = c[i]; return lerp(a.y, b.y, (u - a.x) / (b.x - a.x || 1)); }
+      return c[c.length - 1].y;
+    };
+  };
+  const jawLineY = tabY([[0.3, -0.29], [0.6, -0.26], [1.0, -0.21], [1.4, -0.15], [1.8, -0.09], [2.15, -0.03]]);
+  const sideTopY = tabY([[0.3, 0.27], [0.6, 0.2], [1.0, 0.07], [1.4, 0.06], [1.8, 0.14], [2.15, 0.24]]);
+  const bandTopY = tabY([[0.3, 0.12], [0.6, 0.1], [1.0, 0.05], [1.4, 0.06], [1.8, 0.14], [2.15, 0.24]]);
+  // continuous base mandible shell under every plate (closes the lower head)
   {
-    const yTop = 0.352;
+    const UB = 2.15;
     const S = (u, b, t) => {
-      const y = lerp(jawLineY(u) - 0.004, yTop, b);
+      const au = Math.abs(u);
+      const y = lerp(jawLineY(au) - 0.01, sideTopY(au) + 0.02, b);
       headSurface(u, y, t);
       headNormal(u, y, _t);
-      return t.addScaledVector(_t, -0.008 + 0.005 * Math.sin(Math.PI * b));
+      return t.addScaledVector(_t, -0.012 + bulge(t.x, y) * 0.6);
     };
-    const out = (u, b) => headNormal(u, lerp(jawLineY(u), yTop, b), new V3());
-    pair(plate({ a0: 1.3, a1: U_BACK, b0: 0, b1: 1, S, out, thickness: 0.04, bevel: 0.012, gap: 0.004, segU: 30, segV: 14 }),
-      mat.ramus, 'jaw.ramus', fxRamus);
-    // hinge boss, just below the cranium plates
-    for (const side of [1, -1]) {
-      const hu = 1.98 * side, hy = 0.265;
-      const hp = headSurface(hu, hy, new V3());
-      const hn = headNormal(hu, hy, new V3());
-      const boss = ctx.mesh(geo.ringStack([[0, 0.008], [0.014, 0.008], [0.017, 0.012], [0.028, 0.012], [0.034, 0.007], [0.038, 0.0], [0.041, -0.02]], 40), mat.bright, `jaw.hinge.${side > 0 ? 'L' : 'R'}`);
-      boss.position.copy(hp).addScaledVector(hn, 0.002);
-      geo.faceDirection(boss, hn);
-      fxRamus.add(boss);
-    }
+    const out = (u, b) => headNormal(u, lerp(jawLineY(Math.abs(u)), sideTopY(Math.abs(u)), b), new V3());
+    root.add(ctx.mesh(plate({ a0: -UB, a1: UB, b0: 0, b1: 1, S, out, thickness: 0.03, bevel: 0.006, segU: 72, segV: 14 }), mat.base, 'jaw.base'));
   }
-
-  // ------------------------------------------------------------ muzzle (broad forward-projecting chin plate)
-  // Spine in the (y, z) plane from under the chin (b = 0, curls under) up to
-  // just below the lower lip (b = 1). The muzzle is a wide rounded shield,
-  // V-shaped toward the bottom, whose sides fall back onto the head shell /
-  // mandible bands. A darker, slightly wider "step" plate sits behind it so
-  // the edge reads as a layered depth step.
-  const spinePts = [
-    [-0.33, 0.5], [-0.322, 0.58], [-0.295, 0.645], [-0.24, 0.697], [-0.16, 0.728], [-0.07, 0.738], [0.02, 0.733], [0.1, 0.72],
+  const BANDS = [
+    { key: 'A', b0: 0.66, b1: 1.0, off: 0.012, grp: fxA, m: mat.sideA },
+    { key: 'B', b0: 0.33, b1: 0.66, off: 0.006, grp: fxB, m: mat.sideB },
+    { key: 'C', b0: 0.0, b1: 0.33, off: 0.0, grp: root, m: mat.sideC },
   ];
-  const spine = new THREE.SplineCurve(spinePts.map(([y, z]) => new THREE.Vector2(z, y)));
-  const _sp = new THREE.Vector2();
-  const _tg = new THREE.Vector2();
-  const spineFrame = (b) => {
-    spine.getPointAt(clamp(b, 0, 1), _sp);
-    spine.getTangentAt(clamp(b, 0, 1), _tg); // (dz, dy), pointing up the chin
-    return { z: _sp.x, y: _sp.y, nz: _tg.y, ny: -_tg.x }; // outward normal in the yz plane
-  };
-  // half width: V toward the bottom, broad under the mouth
-  const muzW = (b) => lerp(0.08, 0.15, sstep(b, 0.0, 0.2)) + 0.11 * sstep(b, 0.15, 0.8);
-  const makeMuzzle = (wScale, sink, edgeLift) => (a, b, t) => {
-    const f = spineFrame(b);
-    const w = muzW(b) * wScale;
-    const x = a * w;
-    const sz = A.headFrontZ(x, f.y);
-    const zEdge = (sz == null ? f.z - 0.06 : sz) + edgeLift;
-    const drop = clamp((f.z - zEdge) * Math.pow(Math.abs(a), 1.5), 0, 0.09);
-    return t.set(x, f.y - f.ny * (drop + sink), f.z - f.nz * (drop + sink));
-  };
-  const muzOut = (a, b) => { const f = spineFrame(b); return new V3(a * 0.5, f.ny, f.nz).normalize(); };
-  const muzS = makeMuzzle(1, 0, 0.016);
-  root.add(ctx.mesh(plate({ a0: -1, a1: 1, b0: 0, b1: 1, S: muzS, out: muzOut, thickness: 0.05, bevel: 0.014, segU: 34, segV: 40 }), mat.column, 'jaw.chin'));
-  // step plate behind the muzzle (wider, darker, sunk)
-  root.add(ctx.mesh(plate({ a0: -1, a1: 1, b0: 0.02, b1: 0.97, S: makeMuzzle(1.17, 0.022, 0.006), out: muzOut, thickness: 0.04, bevel: 0.01, segU: 34, segV: 30 }), mat.bandB, 'jaw.chin.step'));
+  for (const B of BANDS) {
+    const S = (u, b, t) => {
+      const y = lerp(jawLineY(u), bandTopY(u), b);
+      headSurface(u, y, t);
+      headNormal(u, y, _t);
+      const local = (b - B.b0) / (B.b1 - B.b0);
+      return t.addScaledVector(_t, B.off + 0.004 * Math.sin(Math.PI * clamp(local, 0, 1)));
+    };
+    const out = (u, b) => headNormal(u, lerp(jawLineY(u), bandTopY(u), b), new V3());
+    pair(plate({ a0: U0, a1: U1, b0: B.b0, b1: B.b1, S, out, thickness: 0.035, bevel: 0.008, gap: 0.004, segU: 40, segV: 6 }), B.m, `jaw.side.${B.key}`, B.grp);
+  }
 
-  // grooves on the muzzle: vertical pairs flanking the centre + a lip-line groove
-  const muzPt = (a, b, lift) => {
-    const p = muzS(a, b, new V3());
-    const f = spineFrame(b);
-    return p.add(new V3(a * 0.15 * lift, f.ny * lift, f.nz * lift));
-  };
-  const groove = (pts, name, m = mat.dark, w = 0.0075, h = 0.006) => {
-    const g = geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(w, h, 3, 10), { steps: Math.max(8, pts.length * 2), up: () => muzOut(0, 0.5) });
-    root.add(ctx.mesh(g, m, name));
-  };
+  // ------------------------------------------------------------ jaw line rail
   for (const side of [1, -1]) {
-    const key = side > 0 ? 'L' : 'R';
-    const vp = [], rp = [], cp = [];
-    for (let i = 0; i <= 14; i++) {
-      const b = lerp(0.4, 0.95, i / 14);
-      vp.push(muzPt(side * lerp(0.5, 0.6, i / 14), b, 0.0025));
-      rp.push(muzPt(side * lerp(0.6, 0.7, i / 14), b, 0.004));
-    }
-    for (let i = 0; i <= 12; i++) {
-      const b = lerp(0.22, 0.6, i / 12);
-      cp.push(muzPt(side * lerp(0.86, 0.66, i / 12), b, 0.002));
-    }
-    groove(vp, `jaw.chin.groove.${key}`);
-    groove(rp, `jaw.chin.ridge.${key}`, mat.bright, 0.006, 0.006);
-    groove(cp, `jaw.chin.vgroove.${key}`, mat.dark, 0.006, 0.005);
-  }
-  {
-    const hp = [];
-    for (let i = 0; i <= 20; i++) hp.push(muzPt(lerp(-0.62, 0.62, i / 20), 0.88 - 0.03 * Math.cos(Math.PI * (i / 20 - 0.5)) ** 2, 0.0025));
-    groove(hp, 'jaw.chin.groove.top');
-  }
-
-  // ------------------------------------------------------------ chin button (round disc set into the lower front)
-  const btnPivot = new THREE.Group();
-  btnPivot.name = 'jaw.button.pivot';
-  {
-    let bb = 0.3;
-    for (let i = 0; i < 30; i++) { const f = spineFrame(bb); bb = clamp(bb + (-0.185 - f.y) * 1.5, 0, 1); }
-    const f = spineFrame(bb);
-    btnPivot.position.set(0, f.y, f.z);
-    geo.faceDirection(btnPivot, new V3(0, f.ny * 0.7, f.nz).normalize());
-    const R = 0.064;
-    const seat = ctx.mesh(geo.ringStack([[R * 1.32, 0.012], [R * 1.22, 0.006], [R * 1.14, -0.006], [0, -0.006]], 56), mat.dark, 'jaw.button.seat');
-    const rim = ctx.mesh(geo.ringStack([
-      [R * 0.8, 0.012], [R * 0.86, 0.022], [R * 0.95, 0.026], [R * 1.03, 0.02], [R * 1.08, 0.008], [R * 1.1, -0.006],
-    ], 64), mat.bright, 'jaw.button.rim');
-    const face = ctx.mesh(geo.ringStack([
-      [0, 0.024], [R * 0.35, 0.023], [R * 0.6, 0.02], [R * 0.78, 0.014], [R * 0.82, 0.008],
-    ], 48), mat.buttonFace, 'jaw.button');
-    // arch / slot detail on the button face (seen in the reference)
-    const archPts = [];
-    for (let i = 0; i <= 16; i++) {
-      const a = lerp(Math.PI * 0.12, Math.PI * 0.88, i / 16);
-      archPts.push(new V3(Math.cos(a) * R * 0.42, -R * 0.2 + Math.sin(a) * R * 0.28, 0.023));
-    }
-    const arch = ctx.mesh(geo.sweptSection(new THREE.CatmullRomCurve3(archPts), geo.roundedSection(0.006, 0.005, 2, 8), { steps: 24, up: new V3(0, 0, 1) }), mat.dark, 'jaw.button.arch');
-    const oval = new THREE.Group();
-    oval.name = 'jaw.button.oval';
-    oval.add(seat, rim, face, arch);
-    btnPivot.add(oval);
-  }
-  root.add(btnPivot);
-
-  // ------------------------------------------------------------ secondary detail grooves on the mandible plates
-  {
-    const N = new V3();
-    const rings = [[0.66, -3.0, -1.0], [0.78, -2.9, -1.2], [0.9, -2.7, -1.3]];
-    rings.forEach(([r, pA, pB], ri) => {
-      const pts = [];
-      const segs = [];
-      for (let i = 0; i <= 40; i++) {
-        const phi = lerp(pA, pB, i / 40);
-        const ok = discUY(phi, r, _uy) && allowedUY(_uy[0], _uy[1]) && headSurface(_uy[0], _uy[1], new V3()).x > 0.29;
-        if (ok) {
-          const p = headSurface(_uy[0], _uy[1], new V3());
-          headNormal(_uy[0], _uy[1], N);
-          pts.push(p.addScaledVector(N, 0.0055));
-        } else if (pts.length) { segs.push(pts.splice(0)); }
-      }
-      if (pts.length) segs.push(pts);
-      segs.filter((s) => s.length >= 4).forEach((s, si) => {
-        const g = geo.sweptSection(new THREE.CatmullRomCurve3(s), geo.roundedSection(0.006, 0.005, 3, 10), {
-          steps: s.length * 2,
-          up: (t) => s[Math.min(s.length - 1, Math.round(t * (s.length - 1)))].clone().setY(0).normalize(),
-        });
-        pair(g, mat.dark, `jaw.detail.groove${ri}${si ? si : ''}`, root);
-      });
-    });
-  }
-
-  // ------------------------------------------------------------ jaw line (bright layered edge)
-  for (const side of [1, -1]) {
-    const key = side > 0 ? 'L' : 'R';
-    const u0 = 0.6, u1 = 2.28;
     const pts = [];
     const N = new V3();
-    for (let i = 0; i <= 48; i++) {
-      const u = lerp(u0, u1, i / 48);
-      const y = jawLineY(u) + 0.004;
+    const ua = 0.5, ub = 2.08;
+    for (let i = 0; i <= 32; i++) {
+      const u = lerp(ua, ub, i / 32);
+      const y = jawLineY(u) + 0.006;
       const p = headSurface(u * side, y, new V3());
       headNormal(u * side, y, N);
       pts.push(p.addScaledVector(N, 0.012));
     }
-    const line = geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(0.024, 0.012, 3, 16), {
-      steps: 90,
-      up: (t) => { const u = lerp(u0, u1, t); return headNormal(u * side, jawLineY(u), new V3()); },
-      scale: (t) => [0.5 + 0.5 * Math.sin(Math.PI * Math.min(1, 0.08 + t * 1.1)), 1],
+    const line = geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(0.02, 0.011, 3, 14), {
+      steps: 64,
+      up: (t) => { const u = lerp(ua, ub, t); return headNormal(u * side, jawLineY(u), new V3()); },
+      scale: (t) => [0.5 + 0.5 * Math.sin(Math.PI * Math.min(1, 0.06 + t * 1.05)), 1],
     });
-    root.add(ctx.mesh(line, mat.bright, `jaw.line.${key}`));
+    root.add(ctx.mesh(line, mat.bright, `jaw.line.${side > 0 ? 'L' : 'R'}`));
   }
 
-  // ------------------------------------------------------------ under-jaw plates + bottom cap
+  // ------------------------------------------------------------ under-jaw plates + floor
   {
-    const S = (u, b, t) => {
-      const y = lerp(-0.3, jawLineY(u) + 0.03, b);
-      headSurface(u, y, t);
-      headNormal(u, y, _t);
-      return t.addScaledVector(_t, -0.008);
+    // from the jaw line, sloping down / in toward the neck
+    const inner = (u, t) => {
+      const p = headSurface(u, jawLineY(u));
+      return t.set(p.x * 0.4, Math.max(-0.35, jawLineY(u) - 0.04), lerp(p.z, 0.3, 0.5));
     };
-    const out = (u, b) => headNormal(u, lerp(-0.3, jawLineY(u) + 0.03, b), new V3());
-    pair(plate({ a0: 0.04, a1: U_BACK, b0: 0, b1: 1, S, out, thickness: 0.035, bevel: 0.01, segU: 44, segV: 8 }), mat.under, 'jaw.under', root);
+    const _o = new V3();
+    const S = (u, b, t) => {
+      headSurface(u, jawLineY(u) + 0.004, t);
+      headNormal(u, jawLineY(u), _t);
+      t.addScaledVector(_t, -0.006);
+      inner(u, _o);
+      return t.lerp(_o, b);
+    };
+    const out = (u, b) => {
+      const n = headNormal(u, jawLineY(u), new V3());
+      return n.lerp(new V3(0, -1, 0), 0.4 + 0.5 * b).normalize();
+    };
+    pair(plate({ a0: 0.5, a1: U1, b0: 0, b1: 1, S, out, thickness: 0.03, bevel: 0.008, segU: 32, segV: 6 }), mat.under, 'jaw.under', root);
 
-    // flat cap closing the bottom of the head shell in front of the neck
-    const s = headSection(-0.3);
-    const shape = new THREE.Shape();
-    shape.absellipse(0, 0, s.w * 0.98, ((s.zf + s.zb) / 2) * 0.98, 0, Math.PI * 2, false, 0);
-    const cap = new THREE.ExtrudeGeometry(shape, { depth: 0.02, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 2, curveSegments: 32 });
-    cap.rotateX(Math.PI / 2);
-    cap.translate(0, -0.298, s.zc + (s.zf - s.zb) / 2);
-    root.add(ctx.mesh(cap, mat.dark, 'jaw.underCap'));
+    // (no flat floor: the neck socket rises into the head underside here)
   }
 
   // ------------------------------------------------------------ mouth interior
-  // back wall (static, on the head) — sits just in front of the cranium under-shell
   {
-    const u1 = A.headAngleForX(0.23, 0.1);
-    const back = geo.surfaceSheet({
-      surface: headSurface, normal: headNormal, u0: -u1, u1, y0: -0.12, y1: 0.215, segU: 28, segV: 20, offset: -0.021,
-    });
-    headRoot.add(ctx.mesh(back, mat.cavity, 'jaw.mouth.back'));
-  }
-  // teeth-like vertical ribs
-  const ribs = (y0, y1, off, count, halfW, sec) => {
-    const list = [];
-    const N = new V3();
-    for (let i = 0; i < count; i++) {
-      const x = lerp(-halfW, halfW, count === 1 ? 0.5 : i / (count - 1));
-      const pts = [];
-      for (let k = 0; k <= 4; k++) {
-        const y = lerp(y0, y1, k / 4);
-        const u = A.headAngleForX(x, y);
-        const p = headSurface(u, y, new V3());
-        headNormal(u, y, N);
-        pts.push(p.addScaledVector(N, off));
+    // back wall on the head: a dark curved sheet behind the slit
+    const pts = [];
+    const segX = 20, segY = 8;
+    const P = new V3();
+    for (let j = 0; j <= segY; j++) {
+      const y = lerp(MOUTH_Y - 0.11, MOUTH_Y + 0.05, j / segY);
+      for (let i = 0; i <= segX; i++) {
+        const x = lerp(-0.27, 0.27, i / segX);
+        frontPt(x, y, -0.03, P);
+        pts.push(P.x, P.y, P.z);
       }
-      list.push(geo.sweptSection(new THREE.CatmullRomCurve3(pts), sec, { steps: 6, up: new V3(0, 0, 1) }));
     }
-    return geo.mergeGeometries(list, false);
-  };
-  headRoot.add(ctx.mesh(ribs(0.1, 0.19, -0.004, 11, 0.15, geo.roundedSection(0.0075, 0.007, 3, 12)), mat.gun, 'jaw.teeth.upper'));
-  root.add(ctx.mesh(ribs(0.02, 0.205, -0.015, 10, 0.135, geo.roundedSection(0.0075, 0.006, 3, 12)), mat.dark, 'jaw.teeth.lower'));
+    const idx = [];
+    for (let j = 0; j < segY; j++) for (let i = 0; i < segX; i++) {
+      const a = j * (segX + 1) + i, b = a + 1, c = a + segX + 2, d = a + segX + 1;
+      idx.push(a, b, d, b, c, d);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((pts.length / 3) * 2), 2));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    if (g.attributes.normal.getZ(segX / 2) < 0) geo.flipWinding(g);
+    headRoot.add(ctx.mesh(g, mat.cavity, 'jaw.mouth.back'));
+    // floor: a dark box riding the jaw behind the lower lip
+    const floor = new THREE.BoxGeometry(0.46, 0.012, 0.12);
+    floor.translate(0, MOUTH_Y - 0.035, muzZ(0, MOUTH_Y) - 0.08);
+    root.add(ctx.mesh(floor, mat.cavity, 'jaw.mouth.floor'));
+  }
 
   // ------------------------------------------------------------ rig
   const _mJ = new THREE.Matrix4(), _mK = new THREE.Matrix4();
@@ -494,7 +412,6 @@ export function build(ctx) {
   const _mTi = new THREE.Matrix4().makeTranslation(-hinge.x, -hinge.y, -hinge.z);
   const _qK = new THREE.Quaternion(), _pK = new V3(), _dp = new V3(), _one = new V3(1, 1, 1);
   const _G = new THREE.Matrix4();
-  /** give every flex pivot a fraction k of the jaw joint's current motion */
   function syncFlex() {
     const j = rig.joints.jaw;
     const rest = j.userData.restPosition || hinge;
@@ -510,14 +427,15 @@ export function build(ctx) {
     }
   }
 
-  const OPEN_ROT = 0.22;
-  const params = { open: 0, shift: 0, clench: 0 };
+  const OPEN_ROT = 0.26;
+  const params = { open: 0, shift: 0, clench: 0, button: 0 };
   return {
     params,
     paramSpec: {
       open: { min: 0, max: 1, step: 0.01 },
       shift: { min: -1, max: 1, step: 0.01 },
       clench: { min: 0, max: 1, step: 0.01 },
+      button: { min: -1, max: 1, step: 0.01 },
     },
     apply(p) {
       const j = rig.joints.jaw;
@@ -526,9 +444,10 @@ export function build(ctx) {
       j.rotation.set(o * OPEN_ROT - p.clench * 0.012, p.shift * 0.05, 0);
       j.position.set(
         rest.x + p.shift * 0.018,
-        rest.y - o * 0.035 + p.clench * 0.004,
-        rest.z + o * 0.055 - p.clench * 0.006,
+        rest.y - o * 0.03 + p.clench * 0.004,
+        rest.z + o * 0.045 - p.clench * 0.006,
       );
+      btnSpin.rotation.z = p.button * Math.PI;
       syncFlex();
     },
     update() {
