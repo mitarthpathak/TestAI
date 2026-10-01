@@ -1,19 +1,23 @@
 /**
- * PART: lips — thin sculpted metal lips integrated into the lower face.
+ * PART: lips — thick, rounded, stern lip plates around the mouth slit.
  *
- *  - lips.upper   : upper lip (joint lipUpper, child of head). Its top edge
- *                   melts into the face at the upper-lip line, its lower edge
- *                   is a crisp rounded overhang above the mouth slit.
- *  - lips.lower   : lower lip (joint lipLower, child of jaw -> follows `open`),
- *                   sits on top of the chin column.
- *  - lips.philtrum: small raised block in the middle of the upper lip.
- *  - lips.slit    : dark seam strip behind the lip line (rides the lower lip).
- *  - lips.corner.L/R on pivots lips.cornerPivot.L/R at the mouth corners; the
- *                   pivots track the midpoint between both lips every frame so
- *                   the corners stretch when the jaw opens.
+ * Authored on the final head shell (FACE_WARP off), HEAD space, on the same
+ * forward "muzzle" surface as the jaw (shell front + centre bulge).
  *
- * Expressions are morph targets on the lip meshes (smile, frown, sneer,
- * pucker, press) plus joint offsets (part). All authored in HEAD space.
+ *  - lips.upper.L/R : upper lip halves (joint lipUpper, rides the head). The
+ *                     halves stop short of the centre line, leaving the small
+ *                     central notch of the concept sheet.
+ *  - lips.lower.L/R : lower lip halves (joint lipLower, child of jaw -> follow `open`).
+ *  - lips.slit      : dark seam strip behind the lip line (head).
+ *  - lips.notch     : dark recess behind the central notch (head).
+ *  - lips.corner.L/R on pivots lips.cornerPivot.L/R (+ lips.cornerStretch.*):
+ *                     rounded end caps that track the midpoint between both
+ *                     lips every frame, so they stretch when the mouth opens.
+ *
+ * Expressions are morph targets on every lip half (smile, frown, sneer, press)
+ * plus joint offsets (part). Per-side weights allow asymmetric expressions.
+ * Params: part, smile (-1 frown .. +1 smile), asym (-1..1, shifts smile to one
+ * side), sneer, press.
  */
 export const meta = {
   id: 'lips',
@@ -23,104 +27,111 @@ export const meta = {
 export function build(ctx) {
   const { THREE, geo, anatomy: A, rig, materials: M } = ctx;
   const V3 = THREE.Vector3;
-  const { lerp, clamp } = THREE.MathUtils;
-  const { headSurface, headNormal, headAngleForX } = A;
+  const { lerp, clamp, smoothstep: sstep } = THREE.MathUtils;
+  const { headSection, headFrontZ } = A;
+  const LM = A.LANDMARKS;
 
   const upperRoot = ctx.space('lipUpper', 'head');
   const lowerRoot = ctx.space('lipLower', 'head');
+  const headRoot = ctx.space('head', 'head');
+  headRoot.name = 'lips@head';
 
-  const lipMat = M.get('chrome', { roughness: 0.15, clearcoat: 0.5, clearcoatRoughness: 0.18 });
-  const lowerMat = M.get('chrome', { roughness: 0.3, clearcoat: 0.4, clearcoatRoughness: 0.2 });
-  const blockMat = M.get('chrome', { roughness: 0.2, panel: 9, seed: 83, lineWidth: 0.0025, lineDepth: 0.6 });
-  const cornerMat = M.get('gunmetal', { roughness: 0.26 });
+  const upperMat = M.get('chrome', { roughness: 0.16, clearcoat: 0.4, clearcoatRoughness: 0.2, panel: 9, seed: 83, lineWidth: 0.0022, lineDepth: 0.45 });
+  const lowerMat = M.get('chrome', { roughness: 0.2, clearcoat: 0.35, clearcoatRoughness: 0.22, panel: 9, seed: 84, lineWidth: 0.0022, lineDepth: 0.45 });
+  const cornerMat = M.get('gunmetal', { roughness: 0.24 });
   const slitMat = M.get('cavity');
 
-  // ------------------------------------------------------------ layout
-  const W = 0.205;                                 // half width of the mouth
-  // mouth line: nearly flat in the middle, corners turned down (stern)
-  const slitY = (x) => { const s = x / W; return 0.162 - 0.006 * s * s - 0.02 * s ** 4; };
-  // forward push of the muzzle (the mouth sits on a projecting snout)
-  const bulge = (x) => 0.034 * Math.max(0, 1 - (x / 0.34) ** 2);
-  const GAP = 0.0028;                               // half height of the dark seam
-  const upperH = (s) => 0.062 - 0.022 * s * s;      // upper lip height above the seam
-  const lowerH = (s) => 0.064 - 0.02 * s * s;        // lower lip height below the seam
-  const taper = (s) => Math.max(0.3, 1 - 0.62 * Math.pow(Math.abs(s), 2.6));
-
-  /** point on the face: front-projected (x, y) + offset n along the shell normal */
+  // ------------------------------------------------------------ muzzle surface (same as jaw.js)
+  const bulge = (x, y) => {
+    const fx = Math.exp(-Math.pow(Math.abs(x) / 0.27, 3));
+    const fy = sstep(y, -0.3, -0.12) * (1 - 0.35 * sstep(y, 0.2, 0.32));
+    return 0.032 * fx * fy;
+  };
+  const muzZ = (x, y) => {
+    const z = headFrontZ(x, y);
+    return z == null ? headSection(y).zc : z + bulge(x, y);
+  };
+  const frontOut = (x, y, t = new V3()) => {
+    const h = 1e-3;
+    const dzx = (muzZ(x + h, y) - muzZ(x - h, y)) / (2 * h);
+    const dzy = (muzZ(x, y + h) - muzZ(x, y - h)) / (2 * h);
+    return t.set(-dzx, -dzy, 1).normalize();
+  };
   const _N = new V3();
-  const facePoint = (x, y, n, target) => {
-    const u = headAngleForX(x, y);
-    headSurface(u, y, target);
-    headNormal(u, y, _N);
-    return target.addScaledVector(_N, n + bulge(x));
+  const facePoint = (x, y, n, t = new V3()) => {
+    frontOut(x, y, _N);
+    return t.set(x, y, muzZ(x, y)).addScaledVector(_N, n);
   };
 
-  // closed cross-section profiles: [v (0 = seam, normalised by height), n (outward offset)]
+  // ------------------------------------------------------------ layout
+  const MOUTH_Y = LM.mouthCenter[1];
+  // film muzzle mouth is narrower than LANDMARKS.mouthHalfWidth (front ref: ~0.17)
+  const MOUTH_HW = 0.17;
+  const W = MOUTH_HW - 0.012;            // lip ends; the corner caps reach MOUTH_HW
+  const NOTCH = 0.012;                   // half width of the central notch in the upper lip
+  // stern mouth line: flat in the middle, corners turned down
+  const slitY = (x) => { const s = Math.abs(x) / W; return MOUTH_Y - 0.006 * s * s - 0.026 * s ** 4; };
+  const GAP = 0.008;                                   // half height of the dark seam
+  const upperH = (s) => 0.046 - 0.016 * s * s;
+  const lowerH = (s) => 0.048 - 0.014 * s * s;
+  const taper = (s) => Math.max(0.35, 1 - 0.55 * Math.pow(Math.abs(s), 3));
+
+  // closed cross-sections: [v (0 = seam side, 1 = outer edge, normalised by height), n (forward offset)]
   const UPPER = [
-    [1.0, -0.006], [1.02, 0.003], [0.8, 0.009], [0.5, 0.015], [0.22, 0.02], [0.07, 0.023],
-    [0.012, 0.02], [0.0, 0.012], [0.03, 0.002], [0.12, -0.006],
+    [1.0, -0.012], [1.05, 0.004], [0.95, 0.018], [0.75, 0.028], [0.45, 0.035], [0.2, 0.036],
+    [0.05, 0.03], [-0.02, 0.016], [0.0, 0.002], [0.12, -0.012],
   ];
-  const LOWER = [
-    [0.08, -0.006], [0.0, 0.004], [-0.012, 0.016], [-0.06, 0.021], [-0.3, 0.022], [-0.65, 0.021],
-    [-0.92, 0.02], [-1.0, 0.015], [-1.02, 0.004], [-0.94, -0.006],
-  ];
+  const LOWER = UPPER.map(([v, n]) => [-v, n]).reverse();
   const sampleProfile = (pts, count) => {
-    const c = new THREE.CatmullRomCurve3(pts.map(([v, n]) => new V3(v, n * 10, 0)), true, 'centripetal', 0.5);
-    return c.getSpacedPoints(count).slice(0, count).map((p) => [p.x, p.y / 10]);
+    const c = new THREE.CatmullRomCurve3(pts.map(([v, n]) => new V3(v, n * 12, 0)), true, 'centripetal', 0.5);
+    return c.getSpacedPoints(count).slice(0, count).map((p) => [p.x, p.y / 12]);
   };
-  const PROF_N = 30;
+  const PROF_N = 28;
   const profU = sampleProfile(UPPER, PROF_N);
   const profL = sampleProfile(LOWER, PROF_N);
 
-  // expression deformations: (s, v, which) -> { dx, dy, dn, sn (n scale) }
-  const MORPHS = ['smile', 'frown', 'sneer', 'pucker', 'press'];
+  // expression deformations at normalised position s (0 centre .. 1 corner)
+  const MORPHS = ['smile', 'frown', 'sneer', 'press'];
   const deform = (name, s, which) => {
     const s2 = s * s;
     const d = { dx: 0, dy: 0, dn: 0, sn: 1, sv: 1 };
-    if (name === 'smile') { d.dy = 0.024 * s2; d.dx = 0.012 * s * Math.abs(s); d.dn = -0.008 * s2; }
-    else if (name === 'frown') { d.dy = -0.02 * s2; d.dx = -0.004 * s * Math.abs(s); d.dn = -0.002 * s2; }
+    if (name === 'smile') { d.dy = 0.03 * s2 * s; d.dx = 0.012 * s2; d.dn = -0.01 * s2; }
+    else if (name === 'frown') { d.dy = -0.026 * s2 * s; d.dx = -0.004 * s2; d.dn = 0.004 * s2; }
     else if (name === 'sneer') {
-      if (which === 'upper') { d.dy = 0.016 * (1 - 0.7 * s2); d.dn = 0.008 * (1 - s2); d.sv = 1.1; }
-      else { d.dn = 0.003 * (1 - s2); }
-    } else if (name === 'pucker') {
-      d.dx = -0.3 * s * W * (0.4 + 0.6 * Math.abs(s));
-      d.dn = 0.02 * (1 - 0.6 * s2);
-      d.sn = 1.2;
-      d.dy = which === 'upper' ? -0.003 : 0.003;
-    } else if (name === 'press') { d.sn = 0.5; d.sv = 0.82; d.dn = -0.004; }
+      if (which === 'upper') { d.dy = 0.018 * (1 - 0.7 * s2); d.dn = 0.008 * (1 - s2); d.sv = 1.12; }
+      else { d.dn = 0.004 * (1 - s2); d.dy = -0.004 * (1 - s2); }
+    } else if (name === 'press') { d.sn = 0.55; d.sv = 0.8; d.dn = -0.004; }
     return d;
   };
-  const cornerShift = (name) => {
-    const d = deform(name, 1, 'upper');
-    return new V3(d.dx, name === 'sneer' ? d.dy * 0.5 : d.dy, d.dn);
-  };
 
-  /** lofted lip solid; `morph` = name of a morph target or null for the rest shape */
-  function lipPositions(which, morph) {
+  /** lofted half-lip (side = +1 left / -1 right) */
+  function lipPositions(which, side, morph) {
     const prof = which === 'upper' ? profU : profL;
-    const NX = 44;
+    const NX = 26;
+    const x0 = which === 'upper' ? NOTCH : 0;
     const pos = [];
     const P = new V3();
     for (let i = 0; i <= NX; i++) {
-      // denser sampling towards the corners
       const t = i / NX;
-      const s = Math.sin((t - 0.5) * Math.PI) * 0.995;
+      const ax = lerp(x0, W, Math.sin(t * Math.PI / 2)); // denser toward the corner
+      const s = ax / W;
       const d = morph ? deform(morph, s, which) : { dx: 0, dy: 0, dn: 0, sn: 1, sv: 1 };
-      const x0 = s * W;
       const h = (which === 'upper' ? upperH(s) : lowerH(s)) * d.sv;
-      const k = taper(s) * d.sn;
+      const k = taper(s) * d.sn * (which === 'upper' ? 1 : 0.86);
+      // at the notch the upper lip rounds off (cap)
+      const notchRound = which === 'upper' ? 1 - 0.35 * Math.exp(-Math.pow((ax - x0) / 0.008, 2)) : 1;
       for (const [v, nn] of prof) {
-        const x = x0 + d.dx;
-        const y = slitY(x0) + (which === 'upper' ? GAP : -GAP) + v * h + d.dy;
-        facePoint(x, y, nn * k + d.dn * Math.min(1, Math.abs(v) * 4 + 0.2), P);
+        const x = side * (ax + d.dx);
+        const y = slitY(ax) + (which === 'upper' ? GAP : -GAP) + v * h + d.dy;
+        facePoint(x, y, nn * k * notchRound + d.dn * Math.min(1, Math.abs(v) * 4 + 0.2), P);
         pos.push(P.x, P.y, P.z);
       }
     }
     return { pos, NX, NP: prof.length };
   }
 
-  function buildLip(which) {
-    const base = lipPositions(which, null);
+  function buildLip(which, side) {
+    const base = lipPositions(which, side, null);
     const { NX, NP } = base;
     const index = [];
     for (let i = 0; i < NX; i++) {
@@ -129,7 +140,6 @@ export function build(ctx) {
         index.push(a, b, d, b, c, d);
       }
     }
-    // end caps (fan around the ring centroid)
     const capStart = (NX + 1) * NP;
     const addCaps = (pos) => {
       for (const i of [0, NX]) {
@@ -155,13 +165,11 @@ export function build(ctx) {
     // orient outward: the most forward vertex must face +z
     let best = 0;
     for (let i = 0; i < g.attributes.position.count; i++) if (g.attributes.position.getZ(i) > g.attributes.position.getZ(best)) best = i;
-    const flipIt = g.attributes.normal.getZ(best) < 0;
-    if (flipIt) geo.flipWinding(g);
-    // morph targets (absolute positions + normals)
+    if (g.attributes.normal.getZ(best) < 0) geo.flipWinding(g);
     const mp = [], mn = [];
     for (const name of MORPHS) {
       const t = new THREE.BufferGeometry();
-      t.setAttribute('position', new THREE.Float32BufferAttribute(addCaps(lipPositions(which, name).pos), 3));
+      t.setAttribute('position', new THREE.Float32BufferAttribute(addCaps(lipPositions(which, side, name).pos), 3));
       t.setIndex(g.index.clone());
       t.computeVertexNormals();
       mp.push(t.attributes.position);
@@ -174,39 +182,27 @@ export function build(ctx) {
     return g;
   }
 
-  const upper = ctx.mesh(buildLip('upper'), lipMat, 'lips.upper');
-  const lower = ctx.mesh(buildLip('lower'), lowerMat, 'lips.lower');
-  upperRoot.add(upper);
-  lowerRoot.add(lower);
-  for (const m of [upper, lower]) m.updateMorphTargets();
-
-  // ------------------------------------------------------------ philtrum block (upper lip centre)
-  {
-    const s = new THREE.Shape();
-    const y0 = slitY(0) + GAP + upperH(0) * 0.42;
-    const y1 = slitY(0) + GAP + upperH(0) * 1.02;
-    s.moveTo(-0.026, y1);
-    s.lineTo(0.026, y1);
-    s.lineTo(0.022, y0);
-    s.lineTo(-0.022, y0);
-    s.closePath();
-    const g = geo.conformPlate(s, {
-      depth: 0.008, offset: 0.004 + bulge(0), bevel: 0.005, maxEdge: 0.012,
-      // ride on top of the lip bulge
-      lift: (u, y) => 0.02 * clamp((y1 - y) / (y1 - y0), 0, 1) ** 0.7,
-    });
-    upperRoot.add(ctx.mesh(g, blockMat, 'lips.philtrum'));
+  const halves = [];
+  for (const side of [1, -1]) {
+    const key = side > 0 ? 'L' : 'R';
+    const up = ctx.mesh(buildLip('upper', side), upperMat, `lips.upper.${key}`);
+    const lo = ctx.mesh(buildLip('lower', side), lowerMat, `lips.lower.${key}`);
+    upperRoot.add(up);
+    lowerRoot.add(lo);
+    up.updateMorphTargets();
+    lo.updateMorphTargets();
+    halves.push({ mesh: up, side }, { mesh: lo, side });
   }
 
-  // ------------------------------------------------------------ dark seam strip (behind the lip line)
+  // ------------------------------------------------------------ dark seam strip + notch recess (head)
   {
     const segs = 24;
     const pos = [];
     const P = new V3();
     for (let i = 0; i <= segs; i++) {
-      const x = lerp(-W * 1.02, W * 1.02, i / segs);
-      for (const [dy, n] of [[-0.014, 0.004], [0.006, 0.004]]) {
-        facePoint(x, slitY(x) + dy, n, P);
+      const x = lerp(-W * 1.04, W * 1.04, i / segs);
+      for (const [dy, n] of [[-0.03, 0.0], [0.035, 0.0]]) {
+        facePoint(x, slitY(Math.abs(x)) + dy, n, P);
         pos.push(P.x, P.y, P.z);
       }
     }
@@ -221,37 +217,35 @@ export function build(ctx) {
     g.setIndex(index);
     g.computeVertexNormals();
     if (g.attributes.normal.getZ(0) < 0) geo.flipWinding(g);
-    lowerRoot.add(ctx.mesh(g, slitMat, 'lips.slit'));
+    headRoot.add(ctx.mesh(g, slitMat, 'lips.slit'));
+    // notch recess: small dark block filling the central notch
+    const nb = new THREE.BoxGeometry(NOTCH * 2.2, upperH(0) * 0.9, 0.03);
+    const c = facePoint(0, slitY(0) + GAP + upperH(0) * 0.45, 0.012);
+    nb.translate(c.x, c.y, c.z);
+    upperRoot.add(ctx.mesh(nb, slitMat, 'lips.notch'));
   }
 
   // ------------------------------------------------------------ mouth corners
   const corners = {};
-  const cornerGeo = (() => {
-    // small vertical "bracket" that caps the ends of both lips
-    const g = geo.sweptSection(
-      new THREE.CatmullRomCurve3([new V3(0, -0.03, -0.004), new V3(0.004, 0, 0.004), new V3(0, 0.03, -0.004)]),
-      geo.roundedSection(0.0065, 0.009, 3, 14),
-      { steps: 16, up: new V3(0, 0, 1), scale: (t) => [0.7 + 0.3 * Math.sin(Math.PI * t), 0.55 + 0.45 * Math.sin(Math.PI * t)] },
-    );
-    return g;
-  })();
+  const cornerGeo = geo.sweptSection(
+    new THREE.CatmullRomCurve3([new V3(0, -0.034, -0.006), new V3(0.006, 0, 0.006), new V3(0, 0.032, -0.006)]),
+    geo.roundedSection(0.009, 0.012, 3, 14),
+    { steps: 16, up: () => new V3(0, 0, 1), scale: (t) => [0.7 + 0.3 * Math.sin(Math.PI * t), 0.55 + 0.45 * Math.sin(Math.PI * t)] },
+  );
   for (const side of [1, -1]) {
     const key = side > 0 ? 'L' : 'R';
     const pivot = new THREE.Group();
     pivot.name = `lips.cornerPivot.${key}`;
-    const x = W * side * 0.995;
-    const rest = facePoint(x, slitY(x), 0.012, new V3());
+    const x = W * side;
+    const rest = facePoint(x, slitY(W), 0.008);
     pivot.position.copy(rest);
-    const n = headNormal(headAngleForX(x, slitY(x)), slitY(x), new V3());
-    // orient: local +z = face normal
-    geo.faceDirection(pivot, n);
+    geo.faceDirection(pivot, frontOut(x, slitY(W)).add(new V3(side * 0.35, 0, 0)).normalize());
     const piece = ctx.mesh(side > 0 ? cornerGeo : geo.mirrorGeometryX(cornerGeo), cornerMat, `lips.corner.${key}`);
     const stretch = new THREE.Group();
     stretch.name = `lips.cornerStretch.${key}`;
     stretch.add(piece);
     pivot.add(stretch);
     upperRoot.add(pivot);
-    // anchor on the lower lip, used to find the current lower-lip corner position
     const anchor = new THREE.Object3D();
     anchor.name = `lips.cornerAnchor.${key}`;
     anchor.position.copy(rest);
@@ -259,51 +253,27 @@ export function build(ctx) {
     corners[key] = { pivot, stretch, rest, anchor, side, quat: pivot.quaternion.clone() };
   }
 
-  // ------------------------------------------------------------ naso-labial grooves (vertical, beside the mouth)
-  // dark groove + bright ridge just outside it; the upper half rides the head,
-  // the lower half rides the jaw so they separate cleanly when the mouth opens.
-  {
-    const darkMat = M.get('darkMetal');
-    const sec = geo.roundedSection(0.008, 0.007, 3, 10);
-    const ridgeSec = geo.roundedSection(0.007, 0.009, 3, 10);
-    for (const side of [1, -1]) {
-      const key = side > 0 ? 'L' : 'R';
-      const yC = slitY(W);
-      for (const [which, y0, y1, parent] of [['upper', yC + 0.004, 0.265, upperRoot], ['lower', 0.045, yC - 0.004, lowerRoot]]) {
-        const mk = (dx, n) => {
-          const pts = [];
-          for (let i = 0; i <= 10; i++) {
-            const y = lerp(y0, y1, i / 10);
-            const t = (y - 0.045) / (0.265 - 0.045);
-            const x = side * (W + 0.028 + dx + 0.016 * Math.sin(Math.PI * t) - 0.01 * t);
-            pts.push(facePoint(x, y, n, new V3()));
-          }
-          return new THREE.CatmullRomCurve3(pts);
-        };
-        parent.add(ctx.mesh(geo.sweptSection(mk(0, 0.004), sec, { steps: 20, up: new V3(side * 0.6, 0, 1).normalize() }), darkMat, `lips.groove.${which}.${key}`));
-        parent.add(ctx.mesh(geo.sweptSection(mk(0.016, 0.006), ridgeSec, { steps: 20, up: new V3(side * 0.6, 0, 1).normalize() }), lipMat, `lips.ridge.${which}.${key}`));
-      }
-    }
-  }
-
   // ------------------------------------------------------------ rig
-  const _w = new V3(), _l = new V3();
+  const cornerShift = (name) => {
+    const d = deform(name, 1, 'upper');
+    return new V3(d.dx, name === 'sneer' ? d.dy * 0.5 : d.dy, d.dn);
+  };
   const shift = {};
   for (const name of MORPHS) shift[name] = cornerShift(name);
-  const params = { part: 0, smile: 0, sneer: 0, pucker: 0, press: 0 };
+  const params = { part: 0, smile: 0, asym: 0, sneer: 0, press: 0 };
   let cur = { ...params };
+  const sideSmile = (p, side) => clamp(p.smile + p.asym * side * 0.6, -1, 1);
+  const _w = new V3(), _l = new V3();
 
   function placeCorners(p) {
-    const smile = Math.max(0, p.smile), frown = Math.max(0, -p.smile);
     for (const c of Object.values(corners)) {
-      // expression offset (mirrored in x for the right corner)
+      const sm = sideSmile(p, c.side);
+      const smile = Math.max(0, sm), frown = Math.max(0, -sm);
       const off = new V3()
         .addScaledVector(shift.smile, smile)
         .addScaledVector(shift.frown, frown)
-        .addScaledVector(shift.sneer, p.sneer)
-        .addScaledVector(shift.pucker, p.pucker);
+        .addScaledVector(shift.sneer, p.sneer);
       off.x *= c.side;
-      // current lower-lip corner in upper-lip space -> midpoint between the lips
       c.anchor.updateWorldMatrix(true, false);
       upperRoot.updateWorldMatrix(true, false);
       _w.setFromMatrixPosition(c.anchor.matrixWorld);
@@ -314,7 +284,8 @@ export function build(ctx) {
         (c.rest.y + _l.y) / 2 + off.y,
         (c.rest.z + _l.z) / 2 + off.z,
       );
-      c.stretch.scale.set(1 - 0.25 * p.press, 1 + gap / 0.06, 1 + 0.3 * p.pucker);
+      const st = Math.min(gap, 0.035) / 0.066;
+      c.stretch.scale.set((1 - 0.25 * p.press) * (1 + 0.4 * st), 1 + st, 1 + 0.3 * st);
       c.pivot.quaternion.copy(c.quat);
       c.pivot.rotateZ(c.side * (0.5 * smile - 0.35 * frown));
     }
@@ -325,19 +296,19 @@ export function build(ctx) {
     paramSpec: {
       part: { min: 0, max: 1, step: 0.01 },
       smile: { min: -1, max: 1, step: 0.01 },
+      asym: { min: -1, max: 1, step: 0.01 },
       sneer: { min: 0, max: 1, step: 0.01 },
-      pucker: { min: 0, max: 1, step: 0.01 },
       press: { min: 0, max: 1, step: 0.01 },
     },
     apply(p) {
       cur = p;
       const ju = rig.joints.lipUpper, jl = rig.joints.lipLower;
-      ju.position.y = ju.userData.restPosition.y + p.part * 0.012;
-      jl.position.y = jl.userData.restPosition.y - p.part * 0.024;
-      const smile = Math.max(0, p.smile), frown = Math.max(0, -p.smile);
-      const w = [smile, frown, p.sneer, p.pucker, p.press];
-      for (const m of [upper, lower]) {
-        for (let i = 0; i < w.length; i++) m.morphTargetInfluences[i] = w[i];
+      ju.position.y = ju.userData.restPosition.y + p.part * 0.014;
+      jl.position.y = jl.userData.restPosition.y - p.part * 0.03;
+      for (const h of halves) {
+        const sm = sideSmile(p, h.side);
+        const w = [Math.max(0, sm), Math.max(0, -sm), p.sneer, p.press];
+        for (let i = 0; i < w.length; i++) h.mesh.morphTargetInfluences[i] = w[i];
       }
       placeCorners(p);
     },

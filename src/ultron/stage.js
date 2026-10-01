@@ -9,7 +9,7 @@
  *   ?only=jaw,lips    load only these parts
  *   ?isolate=jaw      load everything but show only this part
  *   ?explode=0.5      exploded view
- *   ?bg=reference     garage-ish backdrop instead of black
+ *   ?bg=black         plain black instead of the film backdrop (bg=reference: garage-ish)
  *   ?set=jaw.open=0.8,eyes.lookX=0.4   set part params after load
  *   ?pose=head.ry=0.3                   rotate rig joints (disable idle to keep it)
  */
@@ -22,7 +22,7 @@ import {
 } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import { MaterialLibrary } from './materials.js';
-import { createStudioEnvironment, createLights } from './environment.js';
+import { createStudioEnvironment, createLights, createBackdrop } from './environment.js';
 import { Ultron } from './Ultron.js';
 import { VIEWS } from './anatomy.js';
 
@@ -56,6 +56,10 @@ function viewToCamera(view, camera, controls) {
   const az = THREE.MathUtils.degToRad(v.azimuth);
   const el = THREE.MathUtils.degToRad(v.elevation);
   const t = new THREE.Vector3().fromArray(v.target);
+  // per-view lens: reference stills are long-lens shots (little perspective)
+  camera.fov = v.fov || 28;
+  camera.updateProjectionMatrix();
+  controls.maxDistance = Math.max(16, v.distance * 1.5);
   camera.position.set(
     t.x + v.distance * Math.cos(el) * Math.sin(az),
     t.y + v.distance * Math.sin(el),
@@ -86,7 +90,8 @@ export async function createStage(container, { flags, onStatus } = {}) {
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000000);
+  const backdrop = flags.bg === 'black' ? null : createBackdrop();
+  scene.background = backdrop || new THREE.Color(0x000000);
   const envMap = createStudioEnvironment(renderer);
   scene.environment = envMap;
   const lights = createLights();
@@ -207,6 +212,10 @@ export async function createStage(container, { flags, onStatus } = {}) {
   let raf = 0;
   let frames = 0;
   let disposed = false;
+  // capture mode renders on demand only (software GL frames cost seconds):
+  // nothing while parts build, then `pending` frames when asked
+  let loaded = !capture;
+  let pending = 0;
   const tick = () => {
     if (disposed) return;
     raf = requestAnimationFrame(tick);
@@ -214,8 +223,11 @@ export async function createStage(container, { flags, onStatus } = {}) {
     const dt = Math.min(timer.getDelta(), 0.05);
     controls.update();
     ultron.update(capture ? 0 : dt);
-    composer.render(dt);
-    frames++;
+    if (!capture || (loaded && pending > 0)) {
+      composer.render(dt);
+      frames++;
+      if (pending > 0) pending--;
+    }
   };
   tick();
 
@@ -228,10 +240,13 @@ export async function createStage(container, { flags, onStatus } = {}) {
     if (flags.isolate) ultron.isolate(flags.isolate);
     for (const { part, key, value } of flags.set) ultron.set(part, key, value);
     for (const { joint, key, value } of flags.pose) ultron.rig.pose({ [joint]: { [key]: value } });
+    loaded = true;
     // signal readiness a few frames later (Playwright waits on this)
+    const n = capture ? 2 : 4;
+    pending = n;
     const start = frames;
     const wait = () => {
-      if (frames - start >= 4) window.__ULTRON_READY__ = true;
+      if (frames - start >= n) window.__ULTRON_READY__ = true;
       else requestAnimationFrame(wait);
     };
     wait();
@@ -240,6 +255,13 @@ export async function createStage(container, { flags, onStatus } = {}) {
   const api = {
     renderer, scene, camera, controls, composer, bloom, materials, ultron, lights,
     setView: (v) => viewToCamera(v, camera, controls),
+    /** Resolves after `n` more frames have been rendered (used by snap.mjs). */
+    frames: (n = 2) => new Promise((resolve) => {
+      pending = Math.max(pending, n);
+      const start = frames;
+      const wait = () => (frames - start >= n ? resolve() : requestAnimationFrame(wait));
+      wait();
+    }),
     loading,
     dispose() {
       disposed = true;
@@ -252,6 +274,7 @@ export async function createStage(container, { flags, onStatus } = {}) {
       materials.dispose();
       composer.dispose();
       envMap.dispose();
+      backdrop?.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     },

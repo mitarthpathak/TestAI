@@ -22,9 +22,9 @@
 import * as THREE from 'three';
 
 const BASES = {
-  chrome:    { color: 0x8c9096, metalness: 1.0, roughness: 0.28, clearcoat: 0.08, clearcoatRoughness: 0.3 },
-  gunmetal:  { color: 0x5d6167, metalness: 1.0, roughness: 0.36, clearcoat: 0.05, clearcoatRoughness: 0.4 },
-  darkMetal: { color: 0x2c2e32, metalness: 0.95, roughness: 0.42 },
+  chrome:    { color: 0x9aa1a9, metalness: 1.0, roughness: 0.26, clearcoat: 0.1, clearcoatRoughness: 0.25 },
+  gunmetal:  { color: 0x6e757d, metalness: 1.0, roughness: 0.32, clearcoat: 0.06, clearcoatRoughness: 0.35 },
+  darkMetal: { color: 0x3a3e44, metalness: 0.95, roughness: 0.4 },
   cavity:    { color: 0x08080a, metalness: 0.6, roughness: 0.75 },
   cable:     { color: 0x3a3c40, metalness: 0.9, roughness: 0.5 },
 };

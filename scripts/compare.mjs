@@ -23,7 +23,7 @@ const dir = path.resolve('screenshots', tag);
 const refDir = path.resolve('reference');
 
 const b64 = (p) => (fs.existsSync(p) ? `data:image/${p.endsWith('.webp') ? 'webp' : 'png'};base64,${fs.readFileSync(p).toString('base64')}` : '');
-const cell = (src, label) => `<figure><img src="${src}"/><figcaption>${label}</figcaption></figure>`;
+const cell = (src, label) => !src ? '' : `<figure><img src="${src}"/><figcaption>${label}</figcaption></figure>`;
 
 const html = `<!doctype html><html><head><meta charset="utf-8"><style>
   body{margin:0;background:#111;color:#bbb;font:14px/1.3 system-ui,sans-serif;padding:16px}
@@ -42,9 +42,13 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>
     ${cell(b64(path.join(dir, 'threequarter.png')), `render 3/4 (${tag})`)}
   </div>
   <div class="row">
-    ${cell(b64(path.join(refDir, 'ultron-poster-34.png')), 'REFERENCE poster 3/4')}
     ${cell(b64(path.join(refDir, 'ultron-film-front.png')), 'REFERENCE film')}
+    ${cell(b64(path.join(dir, 'filmfront.png')), `render filmfront (${tag})`)}
+  </div>
+  <div class="row">
     ${cell(b64(path.join(refDir, 'ultron-film-34.png')), 'REFERENCE film 3/4')}
+    ${cell(b64(path.join(dir, 'film34.png')), `render film34 (${tag})`)}
+    ${cell(b64(path.join(refDir, 'ultron-poster-34.png')), 'REFERENCE poster 3/4')}
   </div>
 </body></html>`;
 
