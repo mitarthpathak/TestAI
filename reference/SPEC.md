@@ -22,8 +22,10 @@ E = eye spacing = 0.67 head units. All HEAD space, +X = model's left.
 | neck | body space, head joint at (0, 1.3, -0.05); visible neck from chin (body y ~1.0) to collar (~0.35) |
 
 Camera presets `front`, `filmfront`, `threequarter`, `film34` were solved
-against the matching reference's landmarks, so a render in that view should
-overlay its reference once the eyes are aligned.
+against the matching reference's landmarks AND use long lenses like the
+reference stills (`fov` per view), so a render in that view should overlay
+its reference once the eyes are aligned. (With the old 28deg lens the dome
+looked ~25% too low in front view — that was perspective, not shape.)
 
 ## Verify loop (do this every iteration)
 

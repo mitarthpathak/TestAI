@@ -56,6 +56,10 @@ function viewToCamera(view, camera, controls) {
   const az = THREE.MathUtils.degToRad(v.azimuth);
   const el = THREE.MathUtils.degToRad(v.elevation);
   const t = new THREE.Vector3().fromArray(v.target);
+  // per-view lens: reference stills are long-lens shots (little perspective)
+  camera.fov = v.fov || 28;
+  camera.updateProjectionMatrix();
+  controls.maxDistance = Math.max(16, v.distance * 1.5);
   camera.position.set(
     t.x + v.distance * Math.cos(el) * Math.sin(az),
     t.y + v.distance * Math.sin(el),

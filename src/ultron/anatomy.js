@@ -58,7 +58,8 @@ export const LANDMARKS = {
   mouthCenter:  [0, 0.24, 0.88],      // mouth slit, on the forward muzzle
   mouthHalfWidth: 0.25,
   noseTip:      [0, 0.5, 0.9],        // bottom of the central nose plate (just above the upper lip)
-  browCenter:   [0, 1.1, 0.8],
+  browCenter:   [0, 1.1, 0.77],
+  noseRidgeTop: [0, 1.4, 0.6],       // faceplate nose crest ends here; cranium crest caps it
   eyeL:         JOINTS.eyeL.pos,
   eyeR:         JOINTS.eyeR.pos,
   eyeRadius:    0.06,                  // radius of the glowing iris disc
@@ -113,8 +114,8 @@ export const HEAD_PROFILE = [
   { y: 0.47,  w: 0.62, zf: 0.52, zb: 0.86, n: 2.6, zc: 0.32 },
   { y: 0.72,  w: 0.72, zf: 0.62, zb: 0.95, n: 2.6, zc: 0.17 },
   { y: 0.95,  w: 0.75, zf: 0.64, zb: 1.0,  n: 2.5, zc: 0.08 },
-  { y: 1.2,   w: 0.73, zf: 0.63, zb: 1.04, n: 2.4, zc: 0.03 },
-  { y: 1.45,  w: 0.67, zf: 0.57, zb: 1.0,  n: 2.3, zc: -0.01 },
+  { y: 1.2,   w: 0.73, zf: 0.63, zb: 0.97, n: 2.4, zc: 0.03 },
+  { y: 1.45,  w: 0.67, zf: 0.57, zb: 0.94, n: 2.3, zc: -0.01 },
   { y: 1.65,  w: 0.56, zf: 0.47, zb: 0.9,  n: 2.2, zc: -0.05 },
   { y: 1.8,   w: 0.43, zf: 0.35, zb: 0.72, n: 2.1, zc: -0.08 },
   { y: 1.9,   w: 0.27, zf: 0.21, zb: 0.47, n: 2.0, zc: -0.11 },
@@ -325,14 +326,15 @@ export function warpHeadNormal(p, n) {
 
 /** Camera presets used by the page and by the Playwright capture script. */
 export const VIEWS = {
-  // azimuth: degrees around Y towards the model's left (+X); elevation: degrees up.
-  // front / filmfront / threequarter / film34 are solved against the matching
-  // reference's landmarks (scripts/overlay.mjs pairs them by name).
-  front:        { azimuth: 1,  elevation: -6,  distance: 7.0, target: [0, 1.85, 0] },
-  threequarter: { azimuth: 38, elevation: -17, distance: 6.8, target: [0, 1.95, 0.1] },
+  // azimuth: degrees around Y towards the model's left (+X); elevation: degrees up;
+  // fov: vertical lens angle (default 28). front / filmfront / threequarter /
+  // film34 match their reference's lens + angle (scripts/overlay.mjs pairs them
+  // by name); the long lenses keep the frame height of the 28deg / 7u camera.
+  front:        { azimuth: 1,  elevation: -6,  distance: 19.6, fov: 10, target: [0, 1.85, 0] },
+  threequarter: { azimuth: 38, elevation: -17, distance: 13.3, fov: 14, target: [0, 1.95, 0.1] },
   side:         { azimuth: 90, elevation: 0,   distance: 7.2, target: [0, 1.85, 0] },
   closeup:      { azimuth: 12, elevation: 2,   distance: 4.6, target: [0, 2.3, 0.2] },
-  film34:       { azimuth: 41, elevation: -28, distance: 6.4, target: [0, 1.95, 0.1] },
-  filmfront:    { azimuth: 34, elevation: -5,  distance: 6.6, target: [0, 1.9, 0.1] },
+  film34:       { azimuth: 41, elevation: -28, distance: 12.6, fov: 14, target: [0, 1.95, 0.1] },
+  filmfront:    { azimuth: 34, elevation: -5,  distance: 12.9, fov: 14, target: [0, 1.9, 0.1] },
   hero:         { azimuth: 0,  elevation: -4,  distance: 7.6, target: [0, 1.8, 0] },
 };
