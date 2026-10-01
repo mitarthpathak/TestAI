@@ -42,13 +42,13 @@ export function build(ctx) {
 
   // ------------------------------------------------------------ materials
   const mat = {
-    column: M.get('chrome', { roughness: 0.2, panel: 7, seed: 61, lineWidth: 0.003, lineDepth: 0.7 }),
-    carrier: M.get('chrome', { roughness: 0.18, panel: 8, seed: 69, lineWidth: 0.003, lineDepth: 0.6 }),
-    chin: M.get('chrome', { roughness: 0.22, panel: 5, seed: 67, lineWidth: 0.0035, lineDepth: 0.7 }),
-    muzzle: M.get('gunmetal', { roughness: 0.34, panel: 6.5, seed: 62, lineWidth: 0.0035 }),
-    sideA: M.get('chrome', { roughness: 0.36, panel: 6, seed: 63, lineWidth: 0.0035 }),
+    column: M.get('chrome', { color: 0xc2c8ce, roughness: 0.22, panel: 7, seed: 61, lineWidth: 0.003, lineDepth: 0.7 }),
+    carrier: M.get('chrome', { color: 0xa8aeb5, roughness: 0.22, panel: 8, seed: 69, lineWidth: 0.003, lineDepth: 0.6 }),
+    chin: M.get('chrome', { color: 0xb4bac1, roughness: 0.24, panel: 5, seed: 67, lineWidth: 0.0035, lineDepth: 0.7 }),
+    muzzle: M.get('chrome', { color: 0xb8bec5, roughness: 0.26, panel: 6.5, seed: 62, lineWidth: 0.0035 }),
+    sideA: M.get('chrome', { color: 0xadb4bb, roughness: 0.3, panel: 6, seed: 63, lineWidth: 0.0035 }),
     sideB: M.get('chrome', { roughness: 0.42, color: 0x868d95, panel: 5.5, seed: 64, lineWidth: 0.0035 }),
-    sideC: M.get('chrome', { roughness: 0.38, panel: 5, seed: 65, lineWidth: 0.0035 }),
+    sideC: M.get('chrome', { color: 0xa4abb2, roughness: 0.32, panel: 5, seed: 65, lineWidth: 0.0035 }),
     under: M.get('gunmetal', { roughness: 0.42, panel: 4, seed: 66, lineWidth: 0.004 }),
     step: M.get('gunmetal', { roughness: 0.36 }),
     base: M.get('chrome', { roughness: 0.3, color: 0x8d949c, panel: 3.5, seed: 70, lineWidth: 0.003 }),
@@ -57,6 +57,8 @@ export function build(ctx) {
     dark: M.get('darkMetal'),
     cavity: M.get('cavity'),
   };
+  // close-up reference: light polished steel on the lower face
+  for (const k of ['column', 'carrier', 'chin', 'muzzle', 'sideA', 'sideB', 'sideC', 'base']) { mat[k].envMapIntensity = 2.0; mat[k].roughness = Math.max(mat[k].roughness, 0.36); }
 
   // ------------------------------------------------------------ shared helpers
   const _t = new V3();
@@ -134,63 +136,66 @@ export function build(ctx) {
 
   // ------------------------------------------------------------ lower-lip carrier
   // wide horizontal plate directly under the lower lip (the lips sit on it)
-  const CARRIER_TOP = MOUTH_Y - 0.03;
-  const CARRIER_BOT = MOUTH_Y - 0.115;
+  const CARRIER_TOP = MOUTH_Y - 0.02;
+  const CARRIER_BOT = MOUTH_Y - 0.1;
   {
-    const xHalf = (y) => lerp(0.15, 0.2, sstep(y, CARRIER_BOT, CARRIER_TOP));
+    const xHalf = (y) => lerp(0.12, 0.15, sstep(y, CARRIER_BOT, CARRIER_TOP));
     const S = (a, b, t) => {
       const y = lerp(CARRIER_BOT, CARRIER_TOP, b);
       const x = a * xHalf(y);
       const roll = Math.pow(Math.abs(a), 4) * 0.02; // ends roll back into the face
-      return frontPt(x, y, 0.016 - roll, t);
+      return frontPt(x, y, 0.004 - roll, t);
     };
     const out = (a, b) => frontOut(a * 0.25, lerp(CARRIER_BOT, CARRIER_TOP, b));
     root.add(ctx.mesh(plate({ a0: -1, a1: 1, b0: 0, b1: 1, S, out, thickness: 0.04, bevel: 0.012, segU: 40, segV: 10 }), mat.carrier, 'jaw.carrier'));
   }
 
   // ------------------------------------------------------------ central column
-  const COL_TOP = CARRIER_BOT + 0.004;
-  const COL_BOT = -0.07;
-  const colW = (y) => lerp(0.085, 0.105, sstep(y, COL_BOT, COL_TOP));
+  const COL_TOP = MOUTH_Y - 0.078;
+  const COL_BOT = -0.27;
+  const colW = (y) => lerp(0.066, 0.078, sstep(y, COL_BOT, COL_TOP));
   {
     const S = (a, b, t) => {
       const y = lerp(COL_BOT, COL_TOP, b);
       const x = a * colW(y);
-      return frontPt(x, y, 0.02 - 0.012 * Math.pow(Math.abs(a), 3), t);
+      return frontPt(x, y, 0.034 - 0.014 * Math.pow(Math.abs(a), 3) - 0.02 * sstep(-y, 0.12, 0.27), t);
     };
     const out = (a, b) => frontOut(a * colW(0), lerp(COL_BOT, COL_TOP, b));
     root.add(ctx.mesh(plate({ a0: -1, a1: 1, b0: 0, b1: 1, S, out, thickness: 0.045, bevel: 0.012, segU: 20, segV: 16 }), mat.column, 'jaw.column'));
-    // vertical ribs (grille) on the column
-    for (const side of [1, -1]) {
+    // fine horizontal step seams across the column (close-up)
+    for (const [k, yy] of [[0, 0.07], [1, -0.04], [2, -0.15]]) {
       const pts = [];
       for (let i = 0; i <= 8; i++) {
-        const y = lerp(COL_BOT + 0.03, COL_TOP - 0.012, i / 8);
-        pts.push(frontPt(side * colW(y) * 0.45, y, 0.026));
+        const x = lerp(-0.9, 0.9, i / 8) * colW(yy);
+        pts.push(frontPt(x, yy + 0.008 * Math.abs(x / colW(yy)) ** 2, 0.035 - 0.014 * Math.abs(x / colW(yy)) ** 3 - 0.02 * sstep(-yy, 0.12, 0.27)));
       }
-      tube(pts, 0.009, 0.006, mat.bright, `jaw.column.rib.${side > 0 ? 'L' : 'R'}`, root, new V3(0, 0, 1));
+      tube(pts, 0.004, 0.004, mat.dark, `jaw.column.seam${k}`, root, new V3(0, 0, 1), 16);
     }
     // dark seam groove around the column top
     const sp = [];
     for (let i = 0; i <= 12; i++) {
       const x = lerp(-0.2, 0.2, i / 12);
-      sp.push(frontPt(x * 0.97, CARRIER_BOT - 0.002 + 0.0, 0.004));
+      sp.push(frontPt(x * 0.6, COL_TOP + 0.004, 0.012));
     }
-    tube(sp, 0.008, 0.006, mat.dark, 'jaw.column.seam', root);
+    tube(sp, 0.007, 0.006, mat.dark, 'jaw.column.seam', root);
   }
 
   // ------------------------------------------------------------ flanking muzzle plates (mouth corner -> chin)
   {
-    const yb = -0.13, yt = CARRIER_BOT + 0.01;
-    const xIn = (y) => colW(y) + 0.006;
-    const xOut = (y) => lerp(0.15, 0.225, sstep(y, yb - 0.04, yt));
-    const S = (a, b, t) => {
+    const yb = -0.24, yt = CARRIER_BOT + 0.03;
+    const xIn = (y) => colW(y) + 0.004;
+    const xOut = (y) => lerp(0.13, 0.215, sstep(y, yb - 0.04, yt));
+    const mk = (lift) => (a, b, t) => {
       const y = lerp(yb, yt, b);
       const x = lerp(xIn(y), xOut(y), a);
       // rounded: falls back toward the shell at the outer edge
-      return frontPt(x, y, 0.011 - 0.012 * Math.pow(a, 2.5), t);
+      return frontPt(x, y, lift - 0.012 * Math.pow(a, 2.5), t);
     };
     const out = (a, b) => frontOut(lerp(0.12, 0.25, a), lerp(yb, yt, b));
-    pair(plate({ a0: 0, a1: 1, b0: 0, b1: 1, S, out, thickness: 0.04, bevel: 0.01, gap: 0.003, segU: 16, segV: 18 }), mat.muzzle, 'jaw.muzzle', root);
+    // layered: the upper plate overlaps the lower one (scale-like steps)
+    pair(plate({ a0: 0, a1: 1, b0: 0.62, b1: 1, S: mk(0.026), out, thickness: 0.045, bevel: 0.01, gap: 0.003, segU: 16, segV: 8 }), mat.muzzle, 'jaw.muzzle', root);
+    pair(plate({ a0: 0, a1: 1, b0: 0.3, b1: 0.66, S: mk(0.017), out, thickness: 0.04, bevel: 0.009, gap: 0.003, segU: 16, segV: 8 }), mat.sideA, 'jaw.muzzle.mid', root);
+    pair(plate({ a0: 0, a1: 1, b0: 0, b1: 0.34, S: mk(0.008), out, thickness: 0.04, bevel: 0.008, gap: 0.003, segU: 16, segV: 8 }), mat.sideC, 'jaw.muzzle.low', root);
     // bright seam rail along the outer edge of the muzzle plates
     for (const side of [1, -1]) {
       const pts = [];
@@ -247,12 +252,13 @@ export function build(ctx) {
   btnSpin.name = 'jaw.button.spin';
   {
     let bb = 0.6;
-    for (let i = 0; i < 40; i++) { const f = spineFrame(bb); bb = clamp(bb + (L.chinButton[1] - f.y) * 1.2, 0, 1); }
+    const BTN_Y = -0.3; // LANDMARKS.chinButton is hidden behind the column in the close-up
+    for (let i = 0; i < 40; i++) { const f = spineFrame(bb); bb = clamp(bb + (BTN_Y - f.y) * 1.2, 0, 1); }
     const f = spineFrame(bb);
     const p = chinS(0, bb, new V3());
     btnPivot.position.copy(p).add(new V3(0, f.ny, f.nz).multiplyScalar(0.004));
     geo.faceDirection(btnPivot, new V3(0, f.ny, f.nz).normalize());
-    const R = 0.062;
+    const R = 0.04;
     const seat = ctx.mesh(geo.ringStack([[R * 1.62, 0.004], [R * 1.55, 0.0], [R * 1.48, -0.012], [0, -0.012]], 64), mat.dark, 'jaw.button.seat');
     const ring = ctx.mesh(geo.ringStack([
       [R * 1.02, 0.008], [R * 1.06, 0.022], [R * 1.12, 0.028], [R * 1.2, 0.026], [R * 1.25, 0.016], [R * 1.32, 0.013], [R * 1.4, 0.012], [R * 1.45, 0.002], [R * 1.47, -0.01],

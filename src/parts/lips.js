@@ -36,9 +36,11 @@ export function build(ctx) {
   const headRoot = ctx.space('head', 'head');
   headRoot.name = 'lips@head';
 
-  const upperMat = M.get('chrome', { roughness: 0.16, clearcoat: 0.4, clearcoatRoughness: 0.2, panel: 9, seed: 83, lineWidth: 0.0022, lineDepth: 0.45 });
-  const lowerMat = M.get('chrome', { roughness: 0.2, clearcoat: 0.35, clearcoatRoughness: 0.22, panel: 9, seed: 84, lineWidth: 0.0022, lineDepth: 0.45 });
+  const upperMat = M.get('chrome', { color: 0xc0c6cc, roughness: 0.2, clearcoat: 0.4, clearcoatRoughness: 0.2, panel: 9, seed: 83, lineWidth: 0.0022, lineDepth: 0.45 });
+  const lowerMat = M.get('chrome', { color: 0xc4cad0, roughness: 0.22, clearcoat: 0.35, clearcoatRoughness: 0.22, panel: 9, seed: 84, lineWidth: 0.0022, lineDepth: 0.45 });
   const cornerMat = M.get('gunmetal', { roughness: 0.24 });
+  upperMat.envMapIntensity = lowerMat.envMapIntensity = 2.0;
+  upperMat.roughness = 0.34; lowerMat.roughness = 0.46; lowerMat.color.set(0xd2d7dc);
   const slitMat = M.get('cavity');
 
   // ------------------------------------------------------------ muzzle surface (same as jaw.js)
@@ -66,14 +68,14 @@ export function build(ctx) {
   // ------------------------------------------------------------ layout
   const MOUTH_Y = LM.mouthCenter[1];
   // film muzzle mouth is narrower than LANDMARKS.mouthHalfWidth (front ref: ~0.17)
-  const MOUTH_HW = 0.17;
+  const MOUTH_HW = 0.15;
   const W = MOUTH_HW - 0.012;            // lip ends; the corner caps reach MOUTH_HW
   const NOTCH = 0.012;                   // half width of the central notch in the upper lip
   // stern mouth line: flat in the middle, corners turned down
-  const slitY = (x) => { const s = Math.abs(x) / W; return MOUTH_Y - 0.006 * s * s - 0.026 * s ** 4; };
-  const GAP = 0.008;                                   // half height of the dark seam
-  const upperH = (s) => 0.046 - 0.016 * s * s;
-  const lowerH = (s) => 0.048 - 0.014 * s * s;
+  const slitY = (x) => { const s = Math.abs(x) / W; return MOUTH_Y + 0.012 - 0.004 * s * s - 0.01 * s ** 4; };
+  const GAP = 0.011;                                   // half height of the dark seam
+  const upperH = (s) => 0.028 - 0.008 * s * s;    // thin upper lip, tucks under the nose shield (y ~0.30)
+  const lowerH = (s) => 0.07 - 0.014 * s * s;   // thick rounded lower lip
   const taper = (s) => Math.max(0.35, 1 - 0.55 * Math.pow(Math.abs(s), 3));
 
   // closed cross-sections: [v (0 = seam side, 1 = outer edge, normalised by height), n (forward offset)]
@@ -117,13 +119,13 @@ export function build(ctx) {
       const s = ax / W;
       const d = morph ? deform(morph, s, which) : { dx: 0, dy: 0, dn: 0, sn: 1, sv: 1 };
       const h = (which === 'upper' ? upperH(s) : lowerH(s)) * d.sv;
-      const k = taper(s) * d.sn * (which === 'upper' ? 1 : 0.86);
+      const k = taper(s) * d.sn * (which === 'upper' ? 0.55 : 1.45);
       // at the notch the upper lip rounds off (cap)
       const notchRound = which === 'upper' ? 1 - 0.35 * Math.exp(-Math.pow((ax - x0) / 0.008, 2)) : 1;
       for (const [v, nn] of prof) {
         const x = side * (ax + d.dx);
-        const y = slitY(ax) + (which === 'upper' ? GAP : -GAP) + v * h + d.dy;
-        facePoint(x, y, nn * k * notchRound + d.dn * Math.min(1, Math.abs(v) * 4 + 0.2), P);
+        const y = slitY(ax) + (which === 'upper' ? GAP * 0.7 : -GAP * 1.9) + v * h + d.dy;
+        facePoint(x, y, nn * k * notchRound + (which === "lower" ? 0.04 * Math.min(0, v) * k : 0) + d.dn * Math.min(1, Math.abs(v) * 4 + 0.2), P);
         pos.push(P.x, P.y, P.z);
       }
     }
@@ -201,7 +203,7 @@ export function build(ctx) {
     const P = new V3();
     for (let i = 0; i <= segs; i++) {
       const x = lerp(-W * 1.04, W * 1.04, i / segs);
-      for (const [dy, n] of [[-0.03, 0.0], [0.035, 0.0]]) {
+      for (const [dy, n] of [[-0.03, 0.012], [0.035, 0.0]]) {
         facePoint(x, slitY(Math.abs(x)) + dy, n, P);
         pos.push(P.x, P.y, P.z);
       }

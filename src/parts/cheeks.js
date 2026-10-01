@@ -41,8 +41,15 @@ export function build(ctx) {
   const R0 = LM.cheekDiscRadius; // 0.26
 
   // ------------------------------------------------------------------ frame
-  const C = new THREE.Vector3().fromArray(LM.cheekDiscL);
-  const N = new THREE.Vector3().fromArray(LM.cheekDiscNormalL).normalize();
+  // LOCAL hub / normal override (face close-up: turbine lower + further out,
+  // seen nearly edge-on from the front). Requested core values:
+  //   JOINTS.cheekL.pos = HUB, LANDMARKS.cheekDiscNormalL = NRM (CUTOUTS follow).
+  const HUB = [0.48, 0.38, 0.52];
+  const NRM = [0.92, -0.05, 0.39];
+  const JNT = new THREE.Vector3().fromArray(LM.cheekDiscL);
+  const C = new THREE.Vector3().fromArray(HUB);
+  const N = new THREE.Vector3().fromArray(NRM).normalize();
+  const HUB_OFF = C.clone().sub(JNT); // frame offset from the rig joint (mirrored X on R)
   const EX = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), N).normalize();
   const EY = new THREE.Vector3().crossVectors(N, EX).normalize();
 
@@ -239,17 +246,21 @@ export function build(ctx) {
   }
 
   // -------------------------------------------------------------- materials
-  const rimMat = M.get('chrome', { roughness: 0.17, color: 0xa4abb3, panel: 7, seed: 41, lineWidth: 0.003 });
-  const band1Mat = M.get('chrome', { roughness: 0.22, color: 0x959ca4, panel: 6, seed: 43, lineWidth: 0.0035 });
-  const band2Mat = M.get('gunmetal', { roughness: 0.26, color: 0x7d858e, panel: 5, seed: 47, lineWidth: 0.0035 });
-  const jowlMat = M.get('gunmetal', { roughness: 0.28, color: 0x737a83, panel: 6.5, seed: 49, lineWidth: 0.0035 });
-  const stepMat = M.get('gunmetal', { roughness: 0.3, panel: 14, seed: 53, lineWidth: 0.004 });
+  const rimMat = M.get('chrome', { roughness: 0.22, color: 0xc4cad0, panel: 7, seed: 41, lineWidth: 0.003 });
+  const band1Mat = M.get('chrome', { roughness: 0.24, color: 0xbcc2c8, panel: 6, seed: 43, lineWidth: 0.0035 });
+  const band2Mat = M.get('chrome', { roughness: 0.27, color: 0xa9b0b7, panel: 5, seed: 47, lineWidth: 0.0035 });
+  const jowlMat = M.get('chrome', { roughness: 0.26, color: 0xb2b8bf, panel: 6.5, seed: 49, lineWidth: 0.0035 });
+  const stepMat = M.get('gunmetal', { roughness: 0.34, color: 0x5a6068, panel: 14, seed: 53, lineWidth: 0.004 });
+  const ringMat = M.get('darkMetal', { roughness: 0.62, color: 0x2a2e33, panel: 14, seed: 54, lineWidth: 0.004 });
   const plateMat = M.get('chrome', { roughness: 0.2, color: 0xa8aeb5, panel: 18, seed: 57, lineWidth: 0.0025 });
   const vaneMat = M.get('darkMetal', { roughness: 0.34, color: 0x50555c });
   const darkMat = M.get('darkMetal');
   const cavityMat = M.get('cavity');
   const capMat = M.get('chrome', { roughness: 0.08, color: 0xc2c8ce });
   const glowMat = M.get('redAccent', { intensity: 0.55 });
+  // close-up: lighter polished steel on the outer plates
+  for (const m of [rimMat, band1Mat, band2Mat, jowlMat]) m.envMapIntensity = 1.8;
+  jowlMat.roughness = 0.36; band1Mat.roughness = 0.3;
   const ventMat = M.get('redAccent', { intensity: 0.7 });
 
   // ------------------------------------------------------- band heights
@@ -269,17 +280,17 @@ export function build(ctx) {
   const bottomFn = (th, r) => Math.max(skull(th, r) - 0.06, -0.45);
   // deeper skirts in the lower-front quadrant (toward the mouth corner) so the
   // jowl reads as a solid mass down to the jaw instead of floating tabs
-  const deepFront = (th) => 0.12 + 0.22 * SS(-wrapA(th), 1.6, 2.4);
+  const deepFront = () => 0.07; // shallow: deep skirts showed as walls inside the cavity in front view
 
   const RIM_RC = 0.29, RIM_HW = 0.032;
-  const rimTop = topFn(0.1, 0.1, 0.045, 1, 0);
+  const rimTop = topFn(0.075, 0.1, 0.04, 1, 0);
   const rimGeo = polarSweep({ th0: 0, th1: Math.PI * 2, closed: true, rc: RIM_RC, hw: RIM_HW, top: rimTop, bottom: bottomFn, corner: 0.022, crown: 0.008, segs: 128 });
 
   // band1: inner C, curls under the disc and in to just outside the mouth corner
   const B1_HW = 0.036;
   const B1_RC = spiral(0.36, 0.42, deg(-90), deg(-128));
   const b1Top = topFn(0.1, 0.08, 0.04, 1);
-  const band1Geo = polarSweep({ th0: deg(-128), th1: deg(116), rc: B1_RC, hw: B1_HW, top: b1Top, bottom: bottomFn, corner: 0.024, crown: 0.008, segs: 140, ends: [0.08, 0.12], skirt: deepFront });
+  const band1Geo = polarSweep({ th0: deg(-118), th1: deg(116), rc: B1_RC, hw: B1_HW, top: b1Top, bottom: bottomFn, corner: 0.024, crown: 0.008, segs: 140, ends: [0.08, 0.12], skirt: deepFront });
 
   // band2 + jowl: wrap the back / bottom of the disc, then hand over to a
   // TAIL (swept on the face surface) that runs down and in to the chin.
@@ -288,108 +299,161 @@ export function build(ctx) {
   const b2Top = topFn(0.1, 0.08, 0.034);
   const band2Geo = polarSweep({ th0: B2_END, th1: deg(104), rc: B2_RC, hw: B2_HW, top: b2Top, bottom: bottomFn, corner: 0.024, crown: 0.008, segs: 140, ends: [0, 0.12], skirt: deepFront });
 
-  const J_HW = 0.036, J_END = deg(-88);
-  const J_RC = spiral(0.505, 0.53, deg(-50), J_END);
-  const jTop = topFn(0.085, 0.08, 0.028);
-  const jowlGeo = polarSweep({ th0: J_END, th1: deg(-22), rc: J_RC, hw: J_HW, top: jTop, bottom: bottomFn, corner: 0.02, crown: 0.006, segs: 80, ends: [0, 0.14], skirt: deepFront });
 
-  // ------------------------------------------------------------ tails (HEAD space, left side)
-  const FRAME = new THREE.Matrix4().makeBasis(EX, EY, N).setPosition(C);
-  const polarPt = (th, rcF, topF) => {
-    const r = typeof rcF === 'function' ? rcF(th) : rcF;
-    return new THREE.Vector3(r * Math.cos(th), r * Math.sin(th), topF(th, r)).applyMatrix4(FRAME);
+  // ------------------------------------------------------------ lower face (HEAD space, left side)
+  // Face close-up: under the turbine a thick rounded U band wraps from the
+  // outer face edge down under the disc and back UP to the mouth corner, and
+  // the space between it and the turbine rim is filled with concentric rows
+  // of segmented "scale" tiles (overlapping, stepping outward).
+  // Surface: the skull front blended with a wider jowl ellipsoid, so the
+  // lower face is broad in front view (close-up ref) and wraps back at the sides.
+  const JW = 0.67, JZC = 0.12, JZF = 0.7;
+  const jowlZ = (x, y) => {
+    const q = Math.min(0.995, Math.abs(x) / (JW - 0.06 * SS(0.3 - y, 0, 0.5)));
+    return JZC + JZF * Math.sqrt(1 - q * q) - 0.06 * SS(0.1 - y, 0, 0.35);
   };
-  const surfPt = (x, y, lift) => {
-    const z = anatomy.headFrontZ(x, y) ?? anatomy.headSection(y).zc;
-    const n = anatomy.headNormal(anatomy.headAngleForX(x, y), y, new THREE.Vector3());
-    return new THREE.Vector3(x, y, z).addScaledVector(n, lift);
+  const lowZ = (x, y) => {
+    const hz = anatomy.headFrontZ(x, y);
+    const jz = jowlZ(x, y);
+    return hz == null ? jz : smax(hz, jz, 0.06);
   };
+  const lowN = (x, y, t = new THREE.Vector3()) => {
+    const h = 1e-3;
+    return t.set(-(lowZ(x + h, y) - lowZ(x - h, y)) / (2 * h), -(lowZ(x, y + h) - lowZ(x, y - h)) / (2 * h), 1).normalize();
+  };
+  const lowPt = (x, y, lift, t = new THREE.Vector3()) => {
+    const n = lowN(x, y);
+    return t.set(x, y, lowZ(x, y)).addScaledVector(n, lift);
+  };
+  /** thick bevelled plate on a (a, b) parametrisation of the low surface */
+  function lowPlate(S, { a0 = 0, a1 = 1, b0 = 0, b1 = 1, thickness = 0.05, bevel = 0.01, gap = 0, segU = 16, segV = 6 } = {}) {
+    let flip = false;
+    const map = (a) => (flip ? a0 + a1 - a : a);
+    const h = 1e-3, pa = new THREE.Vector3(), pb = new THREE.Vector3(), tmp = new THREE.Vector3();
+    const P = (a, b, t) => S(map(a), b, t);
+    const outAt = (a, b) => { const p = S(map(a), b, new THREE.Vector3()); return lowN(p.x, p.y); };
+    const Nf = (a, b, t) => {
+      P(a + h, b, pa); P(a - h, b, tmp); pa.sub(tmp);
+      P(a, b + h, pb); P(a, b - h, tmp); pb.sub(tmp);
+      t.crossVectors(pa, pb);
+      const ref = outAt(a, b);
+      if (t.lengthSq() < 1e-16) return t.copy(ref);
+      t.normalize();
+      if (t.dot(ref) < 0) t.negate();
+      return t;
+    };
+    const am = (a0 + a1) / 2, bm = (b0 + b1) / 2;
+    P(am + h, bm, pa); P(am - h, bm, tmp); pa.sub(tmp);
+    P(am, bm + h, pb); P(am, bm - h, tmp); pb.sub(tmp);
+    if (pa.cross(pb).dot(outAt(am, bm)) < 0) flip = true;
+    return geo.shellPatch({ u0: a0, u1: a1, y0: b0, y1: b1, surface: P, normal: Nf, offset: 0, thickness, bevel, gap, segU, segV });
+  }
   const tailSection = (hw, cr, skirt) => {
     const pts = [[hw, -skirt], [hw, -cr]];
     for (let i = 1; i < 6; i++) { const a = (i / 6) * (Math.PI / 2); pts.push([hw - cr + cr * Math.cos(a), -cr + cr * Math.sin(a)]); }
-    for (let i = 1; i < 5; i++) { const u = 1 - (2 * i) / 5; pts.push([u * (hw - cr), 0.004 * (1 - u * u)]); }
+    for (let i = 1; i < 5; i++) { const u = 1 - (2 * i) / 5; pts.push([u * (hw - cr), 0.006 * (1 - u * u)]); }
     for (let i = 0; i < 6; i++) { const a = Math.PI / 2 + (i / 6) * (Math.PI / 2); pts.push([-hw + cr + cr * Math.cos(a), -cr + cr * Math.sin(a)]); }
     pts.push([-hw, -cr], [-hw, -skirt]);
     return pts;
   };
-  /** band continuation: starts inside the polar band end, then rides the face to the chin */
-  function tail({ thEnd, rcF, topF, hw, pts, lift, endScale = 0.55, skirt = 0.06 }) {
-    const P = [polarPt(thEnd + deg(14), rcF, topF), polarPt(thEnd + deg(7), rcF, topF), polarPt(thEnd, rcF, topF)];
-    for (const [x, y, l] of pts) P.push(surfPt(x, y, l ?? lift));
-    const curve = new THREE.CatmullRomCurve3(P, false, 'centripetal');
-    const Nhead = N.clone();
-    const up = (t) => {
-      const q = curve.getPointAt(t);
-      const hn = anatomy.headNormal(anatomy.headAngleForX(q.x, q.y), q.y, new THREE.Vector3());
-      return Nhead.clone().lerp(hn, SS(t, 0.02, 0.3)).normalize();
-    };
-    const scaleAt = (t) => [1 - (1 - endScale) * SS(t, 0.4, 1), 1 - 0.35 * SS(t, 0.75, 1)];
-    // two overlapping segments: the upper one is fixed to the head, the lower
-    // one rides the jaw and slides out from under it when the mouth opens
-    const piece = (t0, t1, k, dy) => {
-      const sub = [];
-      for (let i = 0; i <= 24; i++) sub.push(curve.getPointAt(t0 + ((t1 - t0) * i) / 24));
-      const c = new THREE.CatmullRomCurve3(sub, false, 'centripetal');
-      const sec = tailSection(hw * k, Math.min(0.022, hw * 0.7) * k, skirt).map(([x, y]) => [x, y + dy]);
-      return geo.sweptSection(c, sec, {
-        steps: Math.round(90 * (t1 - t0)) + 4, up: (s) => up(t0 + (t1 - t0) * s), creaseAngle: deg(38),
-        scale: (s) => scaleAt(t0 + (t1 - t0) * s),
-      });
-    };
-    return { curve, up, upper: piece(0, 0.6, 1, 0), lower: piece(0.48, 1, 0.9, -0.008) };
-  }
-  const tail2Geo = tail({ thEnd: B2_END, rcF: B2_RC, topF: b2Top, hw: B2_HW, lift: 0.035,
-    pts: [[0.36, -0.05, 0.04], [0.29, -0.1, 0.045], [0.2, -0.13, 0.06], [0.12, -0.13, 0.08]] });
-  const tailJGeo = tail({ thEnd: J_END, rcF: J_RC, topF: jTop, hw: J_HW, lift: 0.03,
-    pts: [[0.36, -0.12, 0.035], [0.28, -0.19, 0.045], [0.19, -0.23, 0.06], [0.11, -0.24, 0.075]] });
+  const lowBand = (pts, hw, lift, { cr = 0.026, skirt = 0.14, steps = 90, scale = null } = {}) => {
+    const curve = new THREE.CatmullRomCurve3(pts.map(([x, y, l]) => lowPt(x, y, l ?? lift)), false, 'centripetal');
+    const skirtAt = typeof skirt === 'function' ? skirt : () => skirt;
+    return geo.sweptSection(curve, (t) => tailSection(hw, cr, skirtAt(t)), {
+      steps, creaseAngle: deg(38),
+      up: (t) => { const q = curve.getPointAt(t); return lowN(q.x, q.y); },
+      scale: scale || ((t) => [1 - 0.35 * SS(t, 0.85, 1) - 0.25 * SS(0.12 - t, 0, 0.12), 1]),
+    });
+  };
+  // the big U: outer edge -> under the turbine -> up to the mouth corner
+  const uBandGeo = lowBand([
+    [0.61, 0.42, 0.03], [0.6, 0.27], [0.56, 0.12], [0.495, 0.0], [0.415, -0.07], [0.325, -0.095],
+    [0.24, -0.075], [0.185, 0.0], [0.165, 0.1], [0.16, 0.19, 0.035],
+  ], 0.05, 0.045, { cr: 0.022, skirt: (t) => 0.06 + 0.16 * SS(t, 0.15, 0.35) * SS(0.8 - t, 0, 0.2) });
+  // second, inner U (thinner) hugging the turbine bottom, ends under the fan
+  const uBand2Geo = lowBand([
+    [0.6, 0.3, 0.02], [0.575, 0.17], [0.52, 0.07], [0.44, 0.02], [0.36, 0.01], [0.3, 0.035], [0.265, 0.08],
+  ], 0.026, 0.035, { cr: 0.016, skirt: 0.06, steps: 60 });
+  // third, lower layer: under the big U, from the outer jaw to beside the chin plate
+  const uBand3Geo = lowBand([
+    [0.58, 0.16, 0.0], [0.53, 0.02], [0.45, -0.1], [0.35, -0.17], [0.25, -0.19], [0.17, -0.16], [0.125, -0.09], [0.115, -0.02, 0.02],
+  ], 0.036, 0.022, { cr: 0.02, skirt: (t) => 0.06 + 0.16 * SS(t, 0.15, 0.35) * SS(0.8 - t, 0, 0.2), steps: 70 });
 
-  // ------------------------------------------------------------ fan (HEAD space)
-  // ribbed web under the disc between band1 (ends at the mouth corner) and
-  // the band2 tail, so the lower bands read as one dense concentric fan that
-  // sweeps forward to the chin (film frames), with no dark gaps.
-  const FAN_T1 = 0.56;
-  const fanIn = (b, t = new THREE.Vector3()) => t.copy(polarPt(THREE.MathUtils.lerp(deg(-86), deg(-124), b), B1_RC, b1Top));
-  const fanOut = (b) => tail2Geo.curve.getPointAt(THREE.MathUtils.lerp(0.02, FAN_T1, b));
-  const fanUp = (b) => tail2Geo.up(THREE.MathUtils.lerp(0.02, FAN_T1, b));
-  let fanFlip = false;
-  const fanS0 = (a, b, t = new THREE.Vector3()) => {
-    fanIn(b, t).lerp(fanOut(b), a);
-    return t.addScaledVector(fanUp(b), -0.016 - 0.012 * Math.sin(Math.PI * a));
+  // diagonal side band: follows the faceplate cheek-plate outer edge
+  // ((0.525, 0.9) beside the outer eye -> mouth corner (0.158, 0.29)) on its
+  // outer side, so the bright band of the close-up sits between the cheek
+  // plate and the turbine (covers the inner rim of the disc).
+  const EDGE0 = [0.525, 0.9], EDGE1 = [0.158, 0.29];
+  const edgeX = (y) => EDGE1[0] + ((EDGE0[0] - EDGE1[0]) * (y - EDGE1[1])) / (EDGE0[1] - EDGE1[1]);
+  // outer edge of the bright band (measured on the close-up): x at y
+  const OUTER = new THREE.SplineCurve([[0.37, 0.24], [0.4, 0.36], [0.46, 0.6], [0.53, 0.78], [0.6, 0.92]].map(([x, y]) => new THREE.Vector2(x, y)));
+  const outerPts = OUTER.getSpacedPoints(60);
+  const outerX = (y) => {
+    for (let i = 1; i < outerPts.length; i++) if (outerPts[i].y >= y) { const p0 = outerPts[i - 1], p1 = outerPts[i]; return p0.x + ((p1.x - p0.x) * (y - p0.y)) / (p1.y - p0.y || 1); }
+    return outerPts[outerPts.length - 1].x;
   };
-  {
-    const da = fanS0(0.51, 0.5).sub(fanS0(0.49, 0.5)), db = fanS0(0.5, 0.51).sub(fanS0(0.5, 0.49));
-    fanFlip = da.cross(db).dot(fanUp(0.5)) < 0;
-  }
-  const fanS = (a, b, t = new THREE.Vector3()) => {
-    if (fanFlip) a = 1 - a;
-    fanIn(b, t).lerp(fanOut(b), a);
-    // sink below the band tops, with a gentle concave dish between them
-    return t.addScaledVector(fanUp(b), -0.016 - 0.012 * Math.sin(Math.PI * a));
+  const SB_Y0 = 0.25, SB_Y1 = 0.9;
+  const sbS = (a, b, t) => {
+    const y = THREE.MathUtils.lerp(SB_Y0, SB_Y1, b);
+    const xi = Math.max(edgeX(y), 0.17) - 0.004, xo = outerX(y);
+    const x = THREE.MathUtils.lerp(xi, xo, a);
+    // rounded crown across the band
+    return lowPt(x, y, 0.03 + 0.016 * Math.sin(Math.PI * a), t);
   };
-  const fanGeo = (() => {
-    const h = 1e-3, pa = new THREE.Vector3(), pb = new THREE.Vector3(), tmp = new THREE.Vector3();
-    const nrm = (a, b, t) => {
-      fanS(a + h, b, pa); fanS(a - h, b, tmp); pa.sub(tmp);
-      fanS(a, b + h, pb); fanS(a, b - h, tmp); pb.sub(tmp);
-      t.crossVectors(pa, pb).normalize();
-      if (t.dot(fanUp(b)) < 0) t.negate();
-      return t;
-    };
-    return geo.shellPatch({ u0: 0, u1: 1, y0: 0, y1: 1, surface: fanS, normal: nrm, offset: 0, thickness: 0.05, bevel: 0.006, segU: 14, segV: 40 });
-  })();
-  // concentric ribs on the fan (continue the band rhythm down to the chin)
-  const fanRibParts = [];
-  for (const a of [0.22, 0.42, 0.62, 0.82]) {
-    const pts = [];
-    for (let i = 0; i <= 30; i++) {
-      const b = 0.02 + 0.96 * (i / 30);
-      pts.push(fanS(a, b).addScaledVector(fanUp(b), 0.006));
+  const sideBandGeo = lowPlate(sbS, { thickness: 0.07, bevel: 0.016, segU: 14, segV: 40 });
+  // polished rail along its outer edge (borders the turbine)
+  const railPts = [];
+  for (let i = 0; i <= 10; i++) { const y = THREE.MathUtils.lerp(SB_Y0 + 0.03, SB_Y1 - 0.02, i / 10); railPts.push([outerX(y) + 0.012, y, 0.055]); }
+  const sideRailGeo = lowBand(railPts, 0.016, 0.055, { cr: 0.012, skirt: 0.07, steps: 60 });
+
+  // scale tiles: rows around FC (front-plane centre), phi from the inner
+  // side (toward the mouth) round to straight down
+  const FC = [0.4, 0.215];
+  const ROWS = [
+    { r0: 0.075, r1: 0.122, n: 5, lift: 0.014, ph0: 166, ph1: 270 },
+    { r0: 0.116, r1: 0.164, n: 6, lift: 0.021, ph0: 164, ph1: 274 },
+    { r0: 0.158, r1: 0.202, n: 6, lift: 0.028, ph0: 162, ph1: 278 },
+  ];
+  const tileParts = [], tileDark = [];
+  for (const R of ROWS) {
+    for (let k = 0; k < R.n; k++) {
+      const p0 = deg(R.ph0 + ((R.ph1 - R.ph0) * k) / R.n), p1 = deg(R.ph0 + ((R.ph1 - R.ph0) * (k + 1)) / R.n);
+      const S = (a, b, t) => {
+        const ph = THREE.MathUtils.lerp(p0, p1, a);
+        const r = THREE.MathUtils.lerp(R.r0, R.r1, b);
+        // each tile tilts: its outer edge stands proud (overlapping scales)
+        // tilt each tile up (outer edge proud) so it catches the top light like the film scales
+        return lowPt(FC[0] + r * Math.cos(ph), FC[1] + r * Math.sin(ph), R.lift + 0.012 * b * Math.max(0, -Math.sin(ph)), t);
+      };
+      tileParts.push(lowPlate(S, { thickness: 0.022, bevel: 0.006, gap: 0.0015, segU: 6, segV: 4 }));
+      // small dark square socket on the tile (close-up detail)
+      if (k % 3 === 1 && R === ROWS[1]) {
+        const c = S(0.5, 0.5, new THREE.Vector3());
+        const n = lowN(c.x, c.y);
+        const bx = new THREE.BoxGeometry(0.01, 0.01, 0.01);
+        const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
+        bx.applyQuaternion(q);
+        bx.translate(c.x + n.x * 0.006, c.y + n.y * 0.006, c.z + n.z * 0.006);
+        tileDark.push(bx.toNonIndexed());
+        bx.dispose();
+      }
     }
-    fanRibParts.push(geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(0.011, 0.007, 3, 10), {
-      steps: 48, up: (t) => fanUp(0.02 + 0.96 * t), scale: (t) => [0.6 + 0.4 * Math.sin(Math.PI * Math.min(1, 0.1 + t)), 1], creaseAngle: deg(40),
-    }));
   }
-  const fanRibGeo = geo.mergeGeometries(fanRibParts.map((g) => (g.index ? g.toNonIndexed() : g)), false);
+  const tileGeo = geo.mergeGeometries(tileParts.map((g) => (g.index ? g.toNonIndexed() : g)), false);
+  const tileDarkGeo = geo.mergeGeometries(tileDark, false);
+  // backing sheet under the tiles + bands so no gap shows to the jaw
+  const backGeo = lowPlate((a, b, t) => {
+    const ph = deg(THREE.MathUtils.lerp(165, 288, a));
+    const r = THREE.MathUtils.lerp(0.08, 0.3, b);
+    return lowPt(FC[0] + r * Math.cos(ph) * 1.02, FC[1] + r * Math.sin(ph), 0.004, t);
+  }, { thickness: 0.06, bevel: 0.004, segU: 28, segV: 10 });
+  // outer jowl web under / behind the turbine: closes the gaps between the
+  // U bands (3/4 view) without covering the cavity
+  const jowlBackGeo = lowPlate((a, b, t) => {
+    const ph = deg(THREE.MathUtils.lerp(262, 372, a));
+    const r = THREE.MathUtils.lerp(0.2, 0.37, b);
+    return lowPt(FC[0] + r * Math.cos(ph), FC[1] + r * Math.sin(ph), 0.012, t);
+  }, { thickness: 0.08, bevel: 0.006, segU: 30, segV: 8 });
 
   // red vent slot (concept art) between band2 and the fin, on the back side
   const V0 = deg(-22), V1 = deg(34);
@@ -484,6 +548,7 @@ export function build(ctx) {
     const basis = new THREE.Matrix4().makeBasis(EX, EY, N);
     if (side < 0) basis.premultiply(new THREE.Matrix4().makeScale(-1, 1, 1)).multiply(new THREE.Matrix4().makeScale(-1, 1, 1));
     frame.quaternion.setFromRotationMatrix(basis);
+    frame.position.set(HUB_OFF.x * side, HUB_OFF.y, HUB_OFF.z);
     joint.add(frame);
 
     const add = (parent, g, mat, name) => {
@@ -494,16 +559,16 @@ export function build(ctx) {
     add(frame, rimGeo, rimMat, `cheeks.rim.${key}`);
     add(frame, band1Geo, band1Mat, `cheeks.band1.${key}`);
     add(frame, band2Geo, band2Mat, `cheeks.band2.${key}`);
-    add(frame, jowlGeo, jowlMat, `cheeks.jowl.${key}`);
     const headSp = ctx.space(`cheek${key}`, 'head');
-    add(headSp, tail2Geo.upper, band2Mat, `cheeks.tail2.${key}`);
-    add(headSp, tailJGeo.upper, jowlMat, `cheeks.tailJ.${key}`);
-    add(headSp, fanGeo, stepMat, `cheeks.fan.${key}`);
-    add(headSp, fanRibGeo, band2Mat, `cheeks.fanRibs.${key}`);
-    // lower tail segments ride the jaw joint (they slide out when the mouth opens)
-    const jawSp = ctx.space('jaw', 'head');
-    add(jawSp, tail2Geo.lower, band2Mat, `cheeks.tail2Low.${key}`);
-    add(jawSp, tailJGeo.lower, jowlMat, `cheeks.tailJLow.${key}`);
+    add(headSp, uBandGeo, band1Mat, `cheeks.uband.${key}`);
+    add(headSp, sideBandGeo, rimMat, `cheeks.sideBand.${key}`);
+    add(headSp, sideRailGeo, band2Mat, `cheeks.sideRail.${key}`);
+    add(headSp, uBand2Geo, band2Mat, `cheeks.uband2.${key}`);
+    add(ctx.space("jaw", "head"), uBand3Geo, jowlMat, `cheeks.uband3.${key}`); // rides the jaw
+    add(headSp, backGeo, stepMat, `cheeks.scaleBack.${key}`);
+    add(headSp, jowlBackGeo, stepMat, `cheeks.jowlBack.${key}`);
+    add(headSp, tileGeo, jowlMat, `cheeks.scales.${key}`);
+    add(headSp, tileDarkGeo, cavityMat, `cheeks.scaleSockets.${key}`);
     add(frame, ventGeo, ventMat, `cheeks.vent.${key}`);
     add(frame, ventRibGeo, darkMat, `cheeks.ventRibs.${key}`);
     add(frame, wallGeo, cavityMat, `cheeks.wall.${key}`);
@@ -511,7 +576,7 @@ export function build(ctx) {
     const stack = new THREE.Group();
     stack.name = `cheeks.stack.${key}`;
     frame.add(stack);
-    add(stack, stepsGeo, stepMat, `cheeks.steps.${key}`);
+    add(stack, stepsGeo, ringMat, `cheeks.steps.${key}`);
     const rotor = new THREE.Group();
     rotor.name = `cheeks.rotor.${key}`;
     stack.add(rotor);
