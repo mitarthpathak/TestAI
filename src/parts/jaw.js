@@ -1,5 +1,6 @@
 /**
- * PART: jaw — chin column + chin button, layered mandible bands that wrap the
+ * PART: jaw — forward-projecting muzzle (broad V chin plate + step plate,
+ * grooves) + round chin button, layered mandible bands that wrap the
  * cheek discs, the ramus plates running back to the hinge, the V jaw line,
  * the under-jaw closure and the mouth interior (dark cavity + metal teeth).
  *
@@ -17,7 +18,8 @@
  *  - The upper teeth + the mouth back wall live on the HEAD (static); the lower
  *    teeth ride the jaw.
  *
- * Sub-objects: jaw.chin, jaw.rail.L/R, jaw.button(.rim/.arch/.seat/.pivot),
+ * Sub-objects: jaw.chin, jaw.chin.step, jaw.chin.{groove,ridge,vgroove}.L/R,
+ * jaw.chin.groove.top, jaw.button(.rim/.arch/.seat/.pivot), jaw.detail.groove*.L/R,
  * jaw.band.{A,B,C,D}.L/R (= mandible layers), jaw.ramus.L/R, jaw.hinge.L/R,
  * jaw.line.L/R, jaw.under.L/R, jaw.underCap, jaw.mouth.back,
  * jaw.teeth.upper / jaw.teeth.lower, flex pivots jaw.flex.*
@@ -290,14 +292,16 @@ export function build(ctx) {
     }
   }
 
-  // ------------------------------------------------------------ chin column (forward projecting, rounded)
-  // spine in the (y, z) plane from the chin bottom (b = 0, curls under) up
-  // behind the lower lip (b = 1)
+  // ------------------------------------------------------------ muzzle (broad forward-projecting chin plate)
+  // Spine in the (y, z) plane from under the chin (b = 0, curls under) up to
+  // just below the lower lip (b = 1). The muzzle is a wide rounded shield,
+  // V-shaped toward the bottom, whose sides fall back onto the head shell /
+  // mandible bands. A darker, slightly wider "step" plate sits behind it so
+  // the edge reads as a layered depth step.
   const spinePts = [
-    [-0.322, 0.47], [-0.308, 0.56], [-0.278, 0.628], [-0.22, 0.672], [-0.13, 0.69], [-0.03, 0.695], [0.06, 0.692], [0.125, 0.686],
+    [-0.33, 0.5], [-0.322, 0.58], [-0.295, 0.645], [-0.24, 0.697], [-0.16, 0.728], [-0.07, 0.738], [0.02, 0.733], [0.1, 0.72],
   ];
   const spine = new THREE.SplineCurve(spinePts.map(([y, z]) => new THREE.Vector2(z, y)));
-  const colW = (b) => lerp(0.099, 0.093, sstep(b, 0.3, 0.9)) * (1 - 0.4 * (1 - sstep(b, 0.0, 0.2)));
   const _sp = new THREE.Vector2();
   const _tg = new THREE.Vector2();
   const spineFrame = (b) => {
@@ -305,74 +309,117 @@ export function build(ctx) {
     spine.getTangentAt(clamp(b, 0, 1), _tg); // (dz, dy), pointing up the chin
     return { z: _sp.x, y: _sp.y, nz: _tg.y, ny: -_tg.x }; // outward normal in the yz plane
   };
-  const colS = (a, b, t) => {
+  // half width: V toward the bottom, broad under the mouth
+  const muzW = (b) => lerp(0.08, 0.15, sstep(b, 0.0, 0.2)) + 0.11 * sstep(b, 0.15, 0.8);
+  const makeMuzzle = (wScale, sink, edgeLift) => (a, b, t) => {
     const f = spineFrame(b);
-    const w = colW(b);
-    const depth = 0.02 * a * a; // rounded cross-section
-    return t.set(a * w, f.y - f.ny * depth, f.z - f.nz * depth);
+    const w = muzW(b) * wScale;
+    const x = a * w;
+    const sz = A.headFrontZ(x, f.y);
+    const zEdge = (sz == null ? f.z - 0.06 : sz) + edgeLift;
+    const drop = clamp((f.z - zEdge) * Math.pow(Math.abs(a), 1.5), 0, 0.09);
+    return t.set(x, f.y - f.ny * (drop + sink), f.z - f.nz * (drop + sink));
   };
-  const colOut = (a, b) => { const f = spineFrame(b); return new V3(a * 0.3, f.ny, f.nz).normalize(); };
-  const column = plate({ a0: -1, a1: 1, b0: 0, b1: 1, S: colS, out: colOut, thickness: 0.05, bevel: 0.014, segU: 22, segV: 44 });
-  root.add(ctx.mesh(column, mat.column, 'jaw.chin'));
+  const muzOut = (a, b) => { const f = spineFrame(b); return new V3(a * 0.5, f.ny, f.nz).normalize(); };
+  const muzS = makeMuzzle(1, 0, 0.016);
+  root.add(ctx.mesh(plate({ a0: -1, a1: 1, b0: 0, b1: 1, S: muzS, out: muzOut, thickness: 0.05, bevel: 0.014, segU: 34, segV: 40 }), mat.column, 'jaw.chin'));
+  // step plate behind the muzzle (wider, darker, sunk)
+  root.add(ctx.mesh(plate({ a0: -1, a1: 1, b0: 0.02, b1: 0.97, S: makeMuzzle(1.17, 0.022, 0.006), out: muzOut, thickness: 0.04, bevel: 0.01, segU: 34, segV: 30 }), mat.bandB, 'jaw.chin.step'));
 
-  // raised rails along the column edges (the vertical ridges framing the chin)
+  // grooves on the muzzle: vertical pairs flanking the centre + a lip-line groove
+  const muzPt = (a, b, lift) => {
+    const p = muzS(a, b, new V3());
+    const f = spineFrame(b);
+    return p.add(new V3(a * 0.15 * lift, f.ny * lift, f.nz * lift));
+  };
+  const groove = (pts, name, m = mat.dark, w = 0.0075, h = 0.006) => {
+    const g = geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(w, h, 3, 10), { steps: Math.max(8, pts.length * 2), up: () => muzOut(0, 0.5) });
+    root.add(ctx.mesh(g, m, name));
+  };
   for (const side of [1, -1]) {
-    const b0 = 0.36, b1 = 0.93;
-    const pts = [];
-    for (let i = 0; i <= 16; i++) {
-      const b = lerp(b0, b1, i / 16);
-      const p = colS(side * 0.97, b, new V3());
-      const f = spineFrame(b);
-      pts.push(p.add(new V3(0, f.ny * 0.006, f.nz * 0.006)));
+    const key = side > 0 ? 'L' : 'R';
+    const vp = [], rp = [], cp = [];
+    for (let i = 0; i <= 14; i++) {
+      const b = lerp(0.4, 0.95, i / 14);
+      vp.push(muzPt(side * lerp(0.5, 0.6, i / 14), b, 0.0025));
+      rp.push(muzPt(side * lerp(0.6, 0.7, i / 14), b, 0.004));
     }
-    const rail = geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(0.008, 0.01, 3, 12), {
-      steps: 30,
-      up: (t) => { const f = spineFrame(lerp(b0, b1, t)); return new V3(side * 0.5, f.ny, f.nz).normalize(); },
-      scale: (t) => [1, 0.6 + 0.4 * Math.sin(Math.PI * t)],
-    });
-    root.add(ctx.mesh(rail, mat.bright, `jaw.rail.${side > 0 ? 'L' : 'R'}`));
+    for (let i = 0; i <= 12; i++) {
+      const b = lerp(0.22, 0.6, i / 12);
+      cp.push(muzPt(side * lerp(0.86, 0.66, i / 12), b, 0.002));
+    }
+    groove(vp, `jaw.chin.groove.${key}`);
+    groove(rp, `jaw.chin.ridge.${key}`, mat.bright, 0.006, 0.006);
+    groove(cp, `jaw.chin.vgroove.${key}`, mat.dark, 0.006, 0.005);
+  }
+  {
+    const hp = [];
+    for (let i = 0; i <= 20; i++) hp.push(muzPt(lerp(-0.62, 0.62, i / 20), 0.88 - 0.03 * Math.cos(Math.PI * (i / 20 - 0.5)) ** 2, 0.0025));
+    groove(hp, 'jaw.chin.groove.top');
   }
 
-  // ------------------------------------------------------------ chin button (bevelled oval capsule)
+  // ------------------------------------------------------------ chin button (round disc set into the lower front)
   const btnPivot = new THREE.Group();
   btnPivot.name = 'jaw.button.pivot';
   {
-    const b = 0.3;
-    const f = spineFrame(b);
-    btnPivot.position.set(0, f.y + 0.006, f.z - 0.006);
-    geo.faceDirection(btnPivot, new V3(0, -0.14, 1));
-    const R = 0.086;
-    const rim = geo.ringStack([
-      [R * 0.6, 0.014], [R * 0.66, 0.03], [R * 0.76, 0.039], [R * 0.9, 0.036], [R * 0.98, 0.022], [R * 1.02, 0.0], [R * 1.03, -0.03],
-    ], 64);
-    const face = geo.ringStack([
-      [0, 0.028], [R * 0.3, 0.027], [R * 0.46, 0.023], [R * 0.56, 0.016], [R * 0.62, 0.01],
-    ], 48);
-    // arch detail on the button face (the little bridge seen in the reference)
+    let bb = 0.3;
+    for (let i = 0; i < 30; i++) { const f = spineFrame(bb); bb = clamp(bb + (-0.185 - f.y) * 1.5, 0, 1); }
+    const f = spineFrame(bb);
+    btnPivot.position.set(0, f.y, f.z);
+    geo.faceDirection(btnPivot, new V3(0, f.ny * 0.7, f.nz).normalize());
+    const R = 0.064;
+    const seat = ctx.mesh(geo.ringStack([[R * 1.32, 0.012], [R * 1.22, 0.006], [R * 1.14, -0.006], [0, -0.006]], 56), mat.dark, 'jaw.button.seat');
+    const rim = ctx.mesh(geo.ringStack([
+      [R * 0.8, 0.012], [R * 0.86, 0.022], [R * 0.95, 0.026], [R * 1.03, 0.02], [R * 1.08, 0.008], [R * 1.1, -0.006],
+    ], 64), mat.bright, 'jaw.button.rim');
+    const face = ctx.mesh(geo.ringStack([
+      [0, 0.024], [R * 0.35, 0.023], [R * 0.6, 0.02], [R * 0.78, 0.014], [R * 0.82, 0.008],
+    ], 48), mat.buttonFace, 'jaw.button');
+    // arch / slot detail on the button face (seen in the reference)
     const archPts = [];
     for (let i = 0; i <= 16; i++) {
-      const a = lerp(Math.PI * 0.1, Math.PI * 0.9, i / 16);
-      archPts.push(new V3(Math.cos(a) * R * 0.34, -R * 0.14 + Math.sin(a) * R * 0.22, 0.028));
+      const a = lerp(Math.PI * 0.12, Math.PI * 0.88, i / 16);
+      archPts.push(new V3(Math.cos(a) * R * 0.42, -R * 0.2 + Math.sin(a) * R * 0.28, 0.023));
     }
-    const arch = geo.sweptSection(new THREE.CatmullRomCurve3(archPts), geo.roundedSection(0.005, 0.0045, 2, 8), { steps: 24, up: new V3(0, 0, 1) });
+    const arch = ctx.mesh(geo.sweptSection(new THREE.CatmullRomCurve3(archPts), geo.roundedSection(0.006, 0.005, 2, 8), { steps: 24, up: new V3(0, 0, 1) }), mat.dark, 'jaw.button.arch');
     const oval = new THREE.Group();
     oval.name = 'jaw.button.oval';
-    oval.scale.set(1.2, 1.0, 1.0);
-    oval.add(
-      ctx.mesh(rim, mat.bright, 'jaw.button.rim'),
-      ctx.mesh(face, mat.buttonFace, 'jaw.button'),
-      ctx.mesh(arch, mat.bright, 'jaw.button.arch'),
-    );
-    const seat = ctx.mesh(geo.ringStack([[0, -0.002], [R * 1.08, -0.002], [R * 1.12, -0.03]], 48), mat.dark, 'jaw.button.seat');
-    oval.add(seat);
+    oval.add(seat, rim, face, arch);
     btnPivot.add(oval);
   }
   root.add(btnPivot);
 
+  // ------------------------------------------------------------ secondary detail grooves on the mandible plates
+  {
+    const N = new V3();
+    const rings = [[0.66, -3.0, -1.0], [0.78, -2.9, -1.2], [0.9, -2.7, -1.3]];
+    rings.forEach(([r, pA, pB], ri) => {
+      const pts = [];
+      const segs = [];
+      for (let i = 0; i <= 40; i++) {
+        const phi = lerp(pA, pB, i / 40);
+        const ok = discUY(phi, r, _uy) && allowedUY(_uy[0], _uy[1]) && headSurface(_uy[0], _uy[1], new V3()).x > 0.29;
+        if (ok) {
+          const p = headSurface(_uy[0], _uy[1], new V3());
+          headNormal(_uy[0], _uy[1], N);
+          pts.push(p.addScaledVector(N, 0.0055));
+        } else if (pts.length) { segs.push(pts.splice(0)); }
+      }
+      if (pts.length) segs.push(pts);
+      segs.filter((s) => s.length >= 4).forEach((s, si) => {
+        const g = geo.sweptSection(new THREE.CatmullRomCurve3(s), geo.roundedSection(0.006, 0.005, 3, 10), {
+          steps: s.length * 2,
+          up: (t) => s[Math.min(s.length - 1, Math.round(t * (s.length - 1)))].clone().setY(0).normalize(),
+        });
+        pair(g, mat.dark, `jaw.detail.groove${ri}${si ? si : ''}`, root);
+      });
+    });
+  }
+
   // ------------------------------------------------------------ jaw line (bright layered edge)
   for (const side of [1, -1]) {
     const key = side > 0 ? 'L' : 'R';
-    const u0 = 0.3, u1 = 2.28;
+    const u0 = 0.6, u1 = 2.28;
     const pts = [];
     const N = new V3();
     for (let i = 0; i <= 48; i++) {

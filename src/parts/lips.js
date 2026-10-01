@@ -36,8 +36,11 @@ export function build(ctx) {
   const slitMat = M.get('cavity');
 
   // ------------------------------------------------------------ layout
-  const W = 0.19;                                  // half width of the mouth
-  const slitY = (x) => 0.16 - 0.012 * (x / W) ** 2; // mouth line, corners slightly lower (stern)
+  const W = 0.205;                                 // half width of the mouth
+  // mouth line: nearly flat in the middle, corners turned down (stern)
+  const slitY = (x) => { const s = x / W; return 0.162 - 0.006 * s * s - 0.02 * s ** 4; };
+  // forward push of the muzzle (the mouth sits on a projecting snout)
+  const bulge = (x) => 0.034 * Math.max(0, 1 - (x / 0.34) ** 2);
   const GAP = 0.0028;                               // half height of the dark seam
   const upperH = (s) => 0.062 - 0.022 * s * s;      // upper lip height above the seam
   const lowerH = (s) => 0.064 - 0.02 * s * s;        // lower lip height below the seam
@@ -49,7 +52,7 @@ export function build(ctx) {
     const u = headAngleForX(x, y);
     headSurface(u, y, target);
     headNormal(u, y, _N);
-    return target.addScaledVector(_N, n);
+    return target.addScaledVector(_N, n + bulge(x));
   };
 
   // closed cross-section profiles: [v (0 = seam, normalised by height), n (outward offset)]
@@ -188,7 +191,7 @@ export function build(ctx) {
     s.lineTo(-0.022, y0);
     s.closePath();
     const g = geo.conformPlate(s, {
-      depth: 0.008, offset: 0.004, bevel: 0.005, maxEdge: 0.012,
+      depth: 0.008, offset: 0.004 + bulge(0), bevel: 0.005, maxEdge: 0.012,
       // ride on top of the lip bulge
       lift: (u, y) => 0.02 * clamp((y1 - y) / (y1 - y0), 0, 1) ** 0.7,
     });
@@ -254,6 +257,33 @@ export function build(ctx) {
     anchor.position.copy(rest);
     lowerRoot.add(anchor);
     corners[key] = { pivot, stretch, rest, anchor, side, quat: pivot.quaternion.clone() };
+  }
+
+  // ------------------------------------------------------------ naso-labial grooves (vertical, beside the mouth)
+  // dark groove + bright ridge just outside it; the upper half rides the head,
+  // the lower half rides the jaw so they separate cleanly when the mouth opens.
+  {
+    const darkMat = M.get('darkMetal');
+    const sec = geo.roundedSection(0.008, 0.007, 3, 10);
+    const ridgeSec = geo.roundedSection(0.007, 0.009, 3, 10);
+    for (const side of [1, -1]) {
+      const key = side > 0 ? 'L' : 'R';
+      const yC = slitY(W);
+      for (const [which, y0, y1, parent] of [['upper', yC + 0.004, 0.265, upperRoot], ['lower', 0.045, yC - 0.004, lowerRoot]]) {
+        const mk = (dx, n) => {
+          const pts = [];
+          for (let i = 0; i <= 10; i++) {
+            const y = lerp(y0, y1, i / 10);
+            const t = (y - 0.045) / (0.265 - 0.045);
+            const x = side * (W + 0.028 + dx + 0.016 * Math.sin(Math.PI * t) - 0.01 * t);
+            pts.push(facePoint(x, y, n, new V3()));
+          }
+          return new THREE.CatmullRomCurve3(pts);
+        };
+        parent.add(ctx.mesh(geo.sweptSection(mk(0, 0.004), sec, { steps: 20, up: new V3(side * 0.6, 0, 1).normalize() }), darkMat, `lips.groove.${which}.${key}`));
+        parent.add(ctx.mesh(geo.sweptSection(mk(0.016, 0.006), ridgeSec, { steps: 20, up: new V3(side * 0.6, 0, 1).normalize() }), lipMat, `lips.ridge.${which}.${key}`));
+      }
+    }
   }
 
   // ------------------------------------------------------------ rig
