@@ -101,6 +101,15 @@ export class Ultron {
         appear: animate ? 0 : 1,
       };
       for (const g of groups) g.userData.restPosition = g.position.clone();
+      // shadows: every lit mesh casts and receives (glow / unlit pieces don't)
+      for (const g of groups) {
+        g.traverse((o) => {
+          if (!o.isMesh) return;
+          const lit = o.material && !o.material.isMeshBasicMaterial && !o.material.isShaderMaterial && o.material.toneMapped !== false;
+          o.castShadow = !!lit;
+          o.receiveShadow = !!lit;
+        });
+      }
       part.apply(part.params);
       this.parts[entry.id] = part;
       this._applyGroupOffsets(part);

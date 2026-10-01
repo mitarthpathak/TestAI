@@ -9,13 +9,13 @@ export function createStudioEnvironment(renderer) {
   const env = new THREE.Scene();
   env.background = new THREE.Color(0x020203);
 
-  // gradient room: bright-ish ceiling, dim concrete walls, dark floor.
-  // Chrome needs something to reflect or it reads as black.
+  // Dark "MW3" stage: near-black room so chrome only picks up a few hard
+  // strip lights (key above-front, cold rims behind). No fill walls.
   const roomGeo = new THREE.SphereGeometry(20, 48, 24);
   const colors = [];
-  const top = new THREE.Color(0.34, 0.34, 0.35);
-  const mid = new THREE.Color(0.12, 0.115, 0.105);
-  const bot = new THREE.Color(0.03, 0.028, 0.026);
+  const top = new THREE.Color(0.055, 0.058, 0.064);
+  const mid = new THREE.Color(0.016, 0.016, 0.018);
+  const bot = new THREE.Color(0.004, 0.004, 0.004);
   const c = new THREE.Color();
   const pa = roomGeo.attributes.position;
   for (let i = 0; i < pa.count; i++) {
@@ -28,15 +28,6 @@ export function createStudioEnvironment(renderer) {
   const room = new THREE.Mesh(roomGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide }));
   env.add(room);
 
-  // soft gradient floor bounce (warm-ish concrete like the reference garage)
-  const floor = new THREE.Mesh(
-    new THREE.CircleGeometry(12, 32),
-    new THREE.MeshBasicMaterial({ color: new THREE.Color(0.07, 0.065, 0.058) })
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -6;
-  env.add(floor);
-
   const box = (w, h, color, intensity, pos, lookAt = [0, 0, 0]) => {
     const m = new THREE.Mesh(
       new THREE.PlaneGeometry(w, h),
@@ -46,19 +37,17 @@ export function createStudioEnvironment(renderer) {
     m.lookAt(...lookAt);
     env.add(m);
   };
-  // key: large overhead strip slightly in front
-  box(10, 2.2, 0xffffff, 2.2, [0, 9, 4]);
-  // overhead beams / strip lights (the garage in the front reference)
-  box(14, 0.5, 0xffffff, 1.4, [0, 8, -3]);
-  box(0.5, 14, 0xf2ece2, 0.9, [-6, 8, 2], [0, 0, 0]);
-  // cool rim left, warm rim right
-  box(1.4, 12, 0xcfe0ff, 1.6, [-10, 2, -4]);
-  box(1.4, 12, 0xffe6cf, 1.3, [10, 2, -5]);
-  // broad soft front fill, low + a dim wall behind the camera (gives chrome mid-tones)
-  box(9, 1.6, 0xffffff, 0.7, [0, -1, 12]);
-  box(16, 8, 0x9a948a, 0.16, [0, 3, 15]);
-  // small kicker for crisp specular pings
-  box(0.6, 3, 0xffffff, 0.5, [6, 5, 8]);
+  // key softbox: high, front-left (matches the shadow-casting key light)
+  box(5, 2.4, 0xfff1e2, 2.0, [-4, 8, 6]);
+  // thin overhead strip for the crest highlight
+  box(8, 0.35, 0xffffff, 1.6, [0, 9, 0]);
+  // cold rim strips behind on both sides
+  box(1.0, 12, 0xd2dcec, 1.9, [-9, 3, -7]);
+  box(1.0, 12, 0xd2dcec, 1.6, [9, 3, -7]);
+  // big dim soft panel front-left: gives the chrome readable mid-tones
+  box(14, 9, 0xc9ccd2, 0.22, [-8, 3, 9]);
+  // very faint warm floor bounce
+  box(10, 10, 0x6b5a48, 0.05, [0, -8, 3]);
 
   const pmrem = new THREE.PMREMGenerator(renderer);
   const rt = pmrem.fromScene(env, 0.02);
@@ -70,22 +59,42 @@ export function createStudioEnvironment(renderer) {
   return rt.texture;
 }
 
-/** Direct lights (for crisp shading on top of the IBL). */
+/**
+ * Direct lights — cinematic "MW3" setup: one hard key that casts soft
+ * shadows, two cold rim lights from behind, almost no fill, plus the small
+ * red bounce from the eyes. Everything else is darkness.
+ */
 export function createLights() {
   const g = new THREE.Group();
   g.name = 'lights';
-  const key = new THREE.DirectionalLight(0xffffff, 0.9);
-  key.position.set(2.5, 7, 5);
-  const rimL = new THREE.DirectionalLight(0xbfd4ff, 1.0);
-  rimL.position.set(-6, 3, -4);
-  const rimR = new THREE.DirectionalLight(0xffe2c8, 0.8);
-  rimR.position.set(6, 2.5, -5);
-  const fill = new THREE.HemisphereLight(0x8a93a0, 0x151210, 0.35);
+
+  const key = new THREE.DirectionalLight(0xfff2e6, 2.3);
+  key.position.set(-3.2, 7.5, 5.5);
+  key.target.position.set(0, 1.8, 0);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.camera.left = -2.6;
+  key.shadow.camera.right = 2.6;
+  key.shadow.camera.top = 2.8;
+  key.shadow.camera.bottom = -1.6;
+  key.shadow.camera.near = 1;
+  key.shadow.camera.far = 20;
+  key.shadow.bias = -0.0004;
+  key.shadow.normalBias = 0.02;
+  key.shadow.radius = 3;
+
+  const rimL = new THREE.DirectionalLight(0xcdd8ea, 2.2);
+  rimL.position.set(-5.5, 3.5, -6);
+  const rimR = new THREE.DirectionalLight(0xcdd8ea, 1.7);
+  rimR.position.set(5.5, 3, -6);
+  // barely-there fill so the shadow side isn't pure black
+  const fill = new THREE.DirectionalLight(0x8e9bb0, 0.12);
+  fill.position.set(4, 1, 6);
   // red bounce from the eyes onto cheeks / nose
   const eyeBounce = new THREE.PointLight(0xff2010, 0.6, 1.6, 2);
   eyeBounce.position.set(0, 2.25, 1.15); // just in front of the eyes (world)
   eyeBounce.name = 'eyeBounce';
-  g.add(key, rimL, rimR, fill, eyeBounce);
+  g.add(key, key.target, rimL, rimR, fill, eyeBounce);
   g.userData = { key, rimL, rimR, fill, eyeBounce };
   return g;
 }

@@ -18,7 +18,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   EffectComposer, RenderPass, EffectPass, BloomEffect, ToneMappingEffect, ToneMappingMode,
   VignetteEffect, SMAAEffect, SMAAPreset, KernelSize,
+  NoiseEffect, BlendFunction, BrightnessContrastEffect,
 } from 'postprocessing';
+import { N8AOPostPass } from 'n8ao';
 import { MaterialLibrary } from './materials.js';
 import { createStudioEnvironment, createLights } from './environment.js';
 import { Ultron } from './Ultron.js';
@@ -79,6 +81,8 @@ export async function createStage(container, { flags, onStatus } = {}) {
   renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping; // tone mapping happens in the effect pass
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -106,18 +110,31 @@ export async function createStage(container, { flags, onStatus } = {}) {
   // ------------------------------------------------------------- post
   const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType });
   composer.addPass(new RenderPass(scene, camera));
+  // ambient occlusion: dark crevices between plates (big part of the "game" look)
+  const ao = new N8AOPostPass(scene, camera, container.clientWidth, container.clientHeight);
+  ao.configuration.aoRadius = 0.22;
+  ao.configuration.distanceFalloff = 0.6;
+  ao.configuration.intensity = 4.0;
+  ao.configuration.color = new THREE.Color(0, 0, 0);
+  ao.configuration.halfRes = !capture;
+  ao.configuration.gammaCorrection = false;
+  ao.setQualityMode(capture ? 'High' : 'Medium');
+  composer.addPass(ao);
   const bloom = new BloomEffect({
-    luminanceThreshold: 3.6,
+    luminanceThreshold: 5.0,
     luminanceSmoothing: 0.3,
     intensity: 2.6,
     mipmapBlur: true,
     radius: 0.72,
     levels: 7,
   });
-  const vignette = new VignetteEffect({ offset: 0.3, darkness: 0.62 });
+  const vignette = new VignetteEffect({ offset: 0.22, darkness: 0.78 });
   const tone = new ToneMappingEffect({ mode: ToneMappingMode.AGX });
+  const grade = new BrightnessContrastEffect({ brightness: -0.02, contrast: 0.16 });
+  const grain = new NoiseEffect({ premultiply: true, blendFunction: BlendFunction.SCREEN });
+  grain.blendMode.opacity.value = capture ? 0.0 : 0.05;
   const smaa = new SMAAEffect({ preset: SMAAPreset.HIGH });
-  composer.addPass(new EffectPass(camera, bloom, vignette, tone));
+  composer.addPass(new EffectPass(camera, bloom, vignette, tone, grade, grain));
   composer.addPass(new EffectPass(camera, smaa));
 
   // ------------------------------------------------------------- model
