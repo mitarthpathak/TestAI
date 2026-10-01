@@ -37,7 +37,7 @@ function socketPoint(anatomy, side, t, k = 1) {
   return [ex + lx * Math.cos(th) - ly * Math.sin(th), ey + lx * Math.sin(th) + ly * Math.cos(th)];
 }
 
-const LENS_R = 0.06;       // LANDMARKS.eyeRadius
+const LENS_R = 0.068;      // a touch larger than LANDMARKS.eyeRadius (film frames)
 const LENS_Z = 0.012;      // lens in front of the eye joint (local z)
 const LID_C = -0.075;      // lid hinge axis behind the eye joint (local z)
 const LID_R = 0.118;       // lid shell radius about the hinge
@@ -47,7 +47,7 @@ const UP_REST = 0.47;      // upper lid edge angle at rest (rad, + up)
 const LO_REST = -0.56;     // lower lid edge angle at rest
 const MEET = -0.06;        // where the lids meet on a blink
 const LOOK_X = 0.2, LOOK_Y = 0.12;
-const LIGHT_I = 0.03;
+const LIGHT_I = 0.01;
 
 const LENS_VERT = /* glsl */ `
 varying vec2 vP;
@@ -71,9 +71,9 @@ void main() {
   float pr = r / max(0.3, uPupil);
   // base layers, outside -> in
   vec3 deep = vec3(0.75, -0.09, -0.075);
-  vec3 red = vec3(3.8, -0.5, -0.42);
-  vec3 orange = vec3(11.0, 0.35, -0.12);
-  vec3 hot = vec3(26.0, 6.5, 2.2);
+  vec3 red = vec3(5.0, -0.62, -0.5);
+  vec3 orange = vec3(12.0, 0.7, 0.45);
+  vec3 hot = vec3(30.0, 10.0, 8.0);
   vec3 col = deep;
   col = mix(col, red, 1.0 - smoothstep(0.66 - aa, 0.66 + aa, pr));
   // radial slits in the red ring (segmented arcs)
@@ -81,7 +81,7 @@ void main() {
   float slit = (1.0 - smoothstep(0.05, 0.09, seg)) * smoothstep(0.3, 0.34, pr) * (1.0 - smoothstep(0.54, 0.58, pr));
   col *= 1.0 - 0.75 * slit;
   col = mix(col, orange, 1.0 - smoothstep(0.27 - aa, 0.27 + aa, pr));
-  col = mix(col, hot, 1.0 - smoothstep(0.1, 0.25, pr));
+  col = mix(col, hot, 1.0 - smoothstep(0.12, 0.3, pr));
   // dark concentric rings (lens / aperture structure)
   float d = ring(pr, 0.29, 0.018, aa);
   d = max(d, ring(r, 0.62, 0.028, aa));
@@ -256,7 +256,7 @@ export function build(ctx) {
     halo.position.z = 0.003;
     halo.renderOrder = 2;
     iris.add(halo);
-    const light = new THREE.PointLight(0xff1808, LIGHT_I, 0.3, 2);
+    const light = new THREE.PointLight(0xff1808, LIGHT_I, 0.2, 2);
     light.name = `eyes.light.${key}`;
     light.position.set(0, 0, 0.03);
     iris.add(light);
