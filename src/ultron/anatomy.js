@@ -331,7 +331,7 @@ export const VIEWS = {
   // film34 match their reference's lens + angle (scripts/overlay.mjs pairs them
   // by name); the long lenses keep the frame height of the 28deg / 7u camera.
   front:        { azimuth: 1,  elevation: -6,  distance: 19.6, fov: 10, target: [0, 1.85, 0] },
-  threequarter: { azimuth: 38, elevation: -17, distance: 13.3, fov: 14, target: [0, 1.95, 0.1] },
+  threequarter: { azimuth: 38, elevation: -17, distance: 13.3, fov: 14, target: [0, 1.95, 0.1], headPose: { rz: -0.22 } }, // concept head is tilted
   side:         { azimuth: 90, elevation: 0,   distance: 7.2, target: [0, 1.85, 0] },
   closeup:      { azimuth: 12, elevation: 2,   distance: 4.6, target: [0, 2.3, 0.2] },
   film34:       { azimuth: 41, elevation: -28, distance: 12.6, fov: 14, target: [0, 1.95, 0.1] },

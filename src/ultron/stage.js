@@ -151,6 +151,13 @@ export async function createStage(container, { flags, onStatus } = {}) {
   if (capture) ultron.idle.enabled = false;
   if (onStatus) ultron.on(onStatus);
 
+  // reference views can carry the head pose of their reference shot
+  // (VIEWS[name].headPose, e.g. the ILM 3/4 concept's head tilt)
+  const applyViewPose = (name) => {
+    const hp = VIEWS[name]?.headPose || {};
+    ultron.rig.pose({ head: { rx: hp.rx || 0, ry: hp.ry || 0, rz: hp.rz || 0 } });
+  };
+
   // ------------------------------------------------------------- resize
   const resize = () => {
     const w = container.clientWidth, h = container.clientHeight;
@@ -240,6 +247,7 @@ export async function createStage(container, { flags, onStatus } = {}) {
   }).then(() => {
     if (flags.isolate) ultron.isolate(flags.isolate);
     for (const { part, key, value } of flags.set) ultron.set(part, key, value);
+    applyViewPose(flags.view || 'hero');
     for (const { joint, key, value } of flags.pose) ultron.rig.pose({ [joint]: { [key]: value } });
     loaded = true;
     // signal readiness a few frames later (Playwright waits on this)
@@ -255,7 +263,7 @@ export async function createStage(container, { flags, onStatus } = {}) {
 
   const api = {
     renderer, scene, camera, controls, composer, bloom, materials, ultron, lights,
-    setView: (v) => viewToCamera(v, camera, controls),
+    setView: (v) => { viewToCamera(v, camera, controls); applyViewPose(v); },
     /** Resolves after `n` more frames have been rendered (used by snap.mjs). */
     frames: (n = 2) => new Promise((resolve) => {
       pending = Math.max(pending, n);
