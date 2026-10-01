@@ -59,10 +59,10 @@ export const LANDMARKS = {
   mouthHalfWidth: 0.25,
   noseTip:      [0, 0.5, 0.9],        // bottom of the central nose plate (just above the upper lip)
   browCenter:   [0, 1.1, 0.77],
-  noseRidgeTop: [0, 1.4, 0.6],       // faceplate nose crest ends here; cranium crest caps it
+  noseRidgeTop: [0, 1.07, 0.77],     // nose board top; the cranium crest starts here at the brow
   eyeL:         JOINTS.eyeL.pos,
   eyeR:         JOINTS.eyeR.pos,
-  eyeRadius:    0.06,                  // radius of the glowing iris disc
+  eyeRadius:    0.068,                 // radius of the glowing iris disc
   socketRadii:  [0.17, 0.085, 0.12],   // eye socket ellipsoid (x, y, z)
   socketTilt:   0.3,                   // radians; outer corner raised (angry slant)
   cheekDiscL:   JOINTS.cheekL.pos,
