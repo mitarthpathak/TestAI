@@ -32,6 +32,8 @@ export const REFS = [
   { view: 'filmfront',    file: 'ultron-film-front.png',    eyeR: [177.8, 163.5], eyeL: [282.5, 144.1] },
   { view: 'film34',       file: 'ultron-film-34.png',       eyeR: [63.9, 81.0],   eyeL: [105.9, 54.3] },
   { view: 'threequarter', file: 'ultron-threequarter.webp', eyeR: [423.5, 237.1], eyeL: [632.5, 231.9] },
+  { view: 'faceclose',    file: 'ultron-face-close.png',    eyeR: [119.0, 161.3], eyeL: [382.6, 158.7] },
+  { view: 'filmbody',     file: 'ultron-film-body.png',     eyeR: [329.5, 144.0], eyeL: [403.0, 143.0] },
 ];
 const only = args.only ? args.only.split(',') : null;
 const H = parseInt(args.height || '560', 10);
