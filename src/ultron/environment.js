@@ -148,10 +148,15 @@ export function createLights() {
   const fill = new THREE.DirectionalLight(0x9fb2c8, 0.55);
   fill.position.set(4, 1, 6);
   // red bounce from the eyes onto cheeks / nose
-  const eyeBounce = new THREE.PointLight(0xff2010, 0.6, 1.6, 2);
-  eyeBounce.position.set(0, 2.25, 1.15); // just in front of the eyes (world)
+  // (two off-axis lights: a single one on the centre line mirrors as a red
+  // stripe down the flat nose board)
+  const eyeBounce = new THREE.PointLight(0xff2010, 0.35, 1.4, 2);
+  eyeBounce.position.set(0.3, 2.25, 0.98); // just in front of each eye (world)
   eyeBounce.name = 'eyeBounce';
-  g.add(key, key.target, rimL, rimR, fill, eyeBounce);
-  g.userData = { key, rimL, rimR, fill, eyeBounce };
+  const eyeBounceR = new THREE.PointLight(0xff2010, 0.35, 1.4, 2);
+  eyeBounceR.position.set(-0.3, 2.25, 0.98);
+  eyeBounceR.name = 'eyeBounceR';
+  g.add(key, key.target, rimL, rimR, fill, eyeBounce, eyeBounceR);
+  g.userData = { key, rimL, rimR, fill, eyeBounce, eyeBounceR };
   return g;
 }
