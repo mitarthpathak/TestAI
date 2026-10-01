@@ -40,7 +40,8 @@ export function build(ctx) {
   const lowerMat = M.get('chrome', { color: 0xc4cad0, roughness: 0.22, clearcoat: 0.35, clearcoatRoughness: 0.22, panel: 9, seed: 84, lineWidth: 0.0022, lineDepth: 0.45 });
   const cornerMat = M.get('gunmetal', { roughness: 0.24 });
   upperMat.envMapIntensity = lowerMat.envMapIntensity = 2.0;
-  upperMat.roughness = 0.34; lowerMat.roughness = 0.46; lowerMat.color.set(0xd2d7dc);
+  upperMat.roughness = 0.3; lowerMat.roughness = 0.34; lowerMat.color.set(0xaab1b8); upperMat.color.set(0xb0b7be);
+  upperMat.envMapIntensity = lowerMat.envMapIntensity = 1.6;
   const slitMat = M.get('cavity');
 
   // ------------------------------------------------------------ muzzle surface (same as jaw.js)
@@ -73,9 +74,9 @@ export function build(ctx) {
   const NOTCH = 0.0015;                  // half width of the central notch in the upper lip
   // stern mouth line: flat in the middle, corners turned down
   const slitY = (x) => { const s = Math.abs(x) / W; return MOUTH_Y + 0.012 - 0.004 * s * s - 0.01 * s ** 4; };
-  const GAP = 0.007;                                   // half height of the dark seam
+  const GAP = 0.0095;                                  // half height of the dark seam
   const upperH = (s) => 0.028 - 0.008 * s * s;    // thin upper lip, tucks under the nose shield (y ~0.30)
-  const lowerH = (s) => 0.062 - 0.012 * s * s;   // thick rounded lower lip
+  const lowerH = (s) => 0.05 - 0.01 * s * s;   // lower lip (flatter in round 5)
   const taper = (s) => Math.max(0.35, 1 - 0.55 * Math.pow(Math.abs(s), 3));
 
   // closed cross-sections: [v (0 = seam side, 1 = outer edge, normalised by height), n (forward offset)]
@@ -119,7 +120,7 @@ export function build(ctx) {
       const s = ax / W;
       const d = morph ? deform(morph, s, which) : { dx: 0, dy: 0, dn: 0, sn: 1, sv: 1 };
       const h = (which === 'upper' ? upperH(s) : lowerH(s)) * d.sv;
-      const k = taper(s) * d.sn * (which === 'upper' ? 0.32 : 1.45);
+      const k = taper(s) * d.sn * (which === 'upper' ? 0.3 : 0.7); // round 5: flatter, stern (close-up: a slit, not a pill)
       // at the notch the upper lip rounds off (cap)
       const notchRound = which === 'upper' ? 1 - 0.35 * Math.exp(-Math.pow((ax - x0) / 0.008, 2)) : 1;
       for (const [v, nn] of prof) {

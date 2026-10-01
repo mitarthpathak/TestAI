@@ -54,15 +54,17 @@ export function build(ctx) {
   // just outside the cheek bands; the root reaches the cranium via the
   // inner connector blade (see below).
   const mainPts = [
-    V(0.73, 1.57, -0.12),
-    V(0.87, 1.43, -0.05),
-    V(0.99, 1.23, 0.03),
-    V(1.07, 0.99, 0.11),
-    V(1.1, 0.76, 0.18),
-    V(1.06, 0.52, 0.26),
-    V(0.97, 0.32, 0.36),
-    V(0.88, 0.2, 0.47),
-    V(0.77, 0.15, 0.6),
+    // round 5: the whole C leans FORWARD (concept 3/4 + film front: a thick
+    // blade hugging the outside of the turbine, hook reaching toward the
+    // mouth); x (front ( ) outline) unchanged. Top = free spike.
+    V(0.79, 1.52, -0.02),
+    V(0.94, 1.32, 0.1),
+    V(1.04, 1.07, 0.24),
+    V(1.09, 0.8, 0.36),
+    V(1.06, 0.55, 0.46),
+    V(0.99, 0.34, 0.52),
+    V(0.9, 0.19, 0.58),
+    V(0.79, 0.1, 0.63),
 ].map(toLocal);
   const mainCurve = new THREE.CatmullRomCurve3(mainPts, false, 'centripetal');
 
@@ -164,8 +166,8 @@ export function build(ctx) {
   const mergeP = mf.P.clone().addScaledVector(mf.B, inwardSign(T_MERGE) * mainW(T_MERGE) * 0.6);
   const innerCurve = new THREE.CatmullRomCurve3([
     knuckleC.clone(),
-    toLocal(V(0.75, 1.5, -0.08)),
-    toLocal(V(0.86, 1.34, -0.02)),
+    toLocal(V(0.75, 1.5, -0.05)),
+    toLocal(V(0.88, 1.35, 0.05)),
     mergeP,
   ], false, 'centripetal');
   const innerW = keys([[0, 0.022], [0.15, 0.03], [0.6, 0.032], [0.9, 0.03], [1, 0.022]]);
