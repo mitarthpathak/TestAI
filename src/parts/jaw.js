@@ -51,7 +51,7 @@ export function build(ctx) {
     sideC: M.get('chrome', { roughness: 0.38, panel: 5, seed: 65, lineWidth: 0.0035 }),
     under: M.get('gunmetal', { roughness: 0.42, panel: 4, seed: 66, lineWidth: 0.004 }),
     step: M.get('gunmetal', { roughness: 0.36 }),
-    base: M.get('chrome', { roughness: 0.46, color: 0x7a8189, panel: 6, seed: 70, lineWidth: 0.003 }),
+    base: M.get('chrome', { roughness: 0.3, color: 0x8d949c, panel: 3.5, seed: 70, lineWidth: 0.003 }),
     bright: M.get('chrome', { roughness: 0.12 }),
     buttonFace: M.get('chrome', { roughness: 0.22 }),
     dark: M.get('darkMetal'),
@@ -137,7 +137,7 @@ export function build(ctx) {
   const CARRIER_TOP = MOUTH_Y - 0.03;
   const CARRIER_BOT = MOUTH_Y - 0.115;
   {
-    const xHalf = (y) => lerp(0.2, 0.275, sstep(y, CARRIER_BOT, CARRIER_TOP));
+    const xHalf = (y) => lerp(0.15, 0.2, sstep(y, CARRIER_BOT, CARRIER_TOP));
     const S = (a, b, t) => {
       const y = lerp(CARRIER_BOT, CARRIER_TOP, b);
       const x = a * xHalf(y);
@@ -172,7 +172,7 @@ export function build(ctx) {
     // dark seam groove around the column top
     const sp = [];
     for (let i = 0; i <= 12; i++) {
-      const x = lerp(-0.27, 0.27, i / 12);
+      const x = lerp(-0.2, 0.2, i / 12);
       sp.push(frontPt(x * 0.97, CARRIER_BOT - 0.002 + 0.0, 0.004));
     }
     tube(sp, 0.008, 0.006, mat.dark, 'jaw.column.seam', root);
@@ -182,7 +182,7 @@ export function build(ctx) {
   {
     const yb = -0.13, yt = CARRIER_BOT + 0.01;
     const xIn = (y) => colW(y) + 0.006;
-    const xOut = (y) => lerp(0.16, 0.31, sstep(y, yb - 0.04, yt));
+    const xOut = (y) => lerp(0.15, 0.225, sstep(y, yb - 0.04, yt));
     const S = (a, b, t) => {
       const y = lerp(yb, yt, b);
       const x = lerp(xIn(y), xOut(y), a);
@@ -252,7 +252,7 @@ export function build(ctx) {
     const p = chinS(0, bb, new V3());
     btnPivot.position.copy(p).add(new V3(0, f.ny, f.nz).multiplyScalar(0.004));
     geo.faceDirection(btnPivot, new V3(0, f.ny, f.nz).normalize());
-    const R = 0.085;
+    const R = 0.062;
     const seat = ctx.mesh(geo.ringStack([[R * 1.62, 0.004], [R * 1.55, 0.0], [R * 1.48, -0.012], [0, -0.012]], 64), mat.dark, 'jaw.button.seat');
     const ring = ctx.mesh(geo.ringStack([
       [R * 1.02, 0.008], [R * 1.06, 0.022], [R * 1.12, 0.028], [R * 1.2, 0.026], [R * 1.25, 0.016], [R * 1.32, 0.013], [R * 1.4, 0.012], [R * 1.45, 0.002], [R * 1.47, -0.01],
@@ -383,7 +383,7 @@ export function build(ctx) {
     for (let j = 0; j <= segY; j++) {
       const y = lerp(MOUTH_Y - 0.11, MOUTH_Y + 0.05, j / segY);
       for (let i = 0; i <= segX; i++) {
-        const x = lerp(-0.27, 0.27, i / segX);
+        const x = lerp(-0.2, 0.2, i / segX);
         frontPt(x, y, -0.03, P);
         pts.push(P.x, P.y, P.z);
       }
@@ -401,7 +401,7 @@ export function build(ctx) {
     if (g.attributes.normal.getZ(segX / 2) < 0) geo.flipWinding(g);
     headRoot.add(ctx.mesh(g, mat.cavity, 'jaw.mouth.back'));
     // floor: a dark box riding the jaw behind the lower lip
-    const floor = new THREE.BoxGeometry(0.46, 0.012, 0.12);
+    const floor = new THREE.BoxGeometry(0.34, 0.012, 0.12);
     floor.translate(0, MOUTH_Y - 0.035, muzZ(0, MOUTH_Y) - 0.08);
     root.add(ctx.mesh(floor, mat.cavity, 'jaw.mouth.floor'));
   }

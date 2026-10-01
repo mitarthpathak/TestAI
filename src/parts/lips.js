@@ -65,13 +65,15 @@ export function build(ctx) {
 
   // ------------------------------------------------------------ layout
   const MOUTH_Y = LM.mouthCenter[1];
-  const W = LM.mouthHalfWidth - 0.012;   // lip ends; the corner caps reach mouthHalfWidth
+  // film muzzle mouth is narrower than LANDMARKS.mouthHalfWidth (front ref: ~0.17)
+  const MOUTH_HW = 0.17;
+  const W = MOUTH_HW - 0.012;            // lip ends; the corner caps reach MOUTH_HW
   const NOTCH = 0.012;                   // half width of the central notch in the upper lip
   // stern mouth line: flat in the middle, corners turned down
-  const slitY = (x) => { const s = Math.abs(x) / W; return MOUTH_Y - 0.004 * s * s - 0.018 * s ** 4; };
+  const slitY = (x) => { const s = Math.abs(x) / W; return MOUTH_Y - 0.006 * s * s - 0.026 * s ** 4; };
   const GAP = 0.008;                                   // half height of the dark seam
-  const upperH = (s) => 0.054 - 0.018 * s * s;
-  const lowerH = (s) => 0.056 - 0.016 * s * s;
+  const upperH = (s) => 0.046 - 0.016 * s * s;
+  const lowerH = (s) => 0.048 - 0.014 * s * s;
   const taper = (s) => Math.max(0.35, 1 - 0.55 * Math.pow(Math.abs(s), 3));
 
   // closed cross-sections: [v (0 = seam side, 1 = outer edge, normalised by height), n (forward offset)]
