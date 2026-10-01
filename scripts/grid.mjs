@@ -1,3 +1,14 @@
+#!/usr/bin/env node
+/**
+ * Zoomed, gridded crop of any image (reference or render) for measuring
+ * pixel positions of features.
+ *
+ *   node scripts/grid.mjs <image> <out.png> [scale=2] [x0 y0 x1 y1] [step=10]
+ *   node scripts/grid.mjs reference/ultron-front.png screenshots/g.png 3 120 220 380 480 10
+ *
+ * Grid lines every `step` source pixels (bright every 5 steps), labelled in
+ * SOURCE pixel coordinates.
+ */
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 const [,, file, out, scaleArg, x0a, y0a, x1a, y1a, stepA] = process.argv;
