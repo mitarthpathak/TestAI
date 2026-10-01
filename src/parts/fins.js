@@ -54,16 +54,16 @@ export function build(ctx) {
   // just outside the cheek bands; the root reaches the cranium via the
   // inner connector blade (see below).
   const mainPts = [
-    V(0.8, 1.47, -0.08),
-    V(0.88, 1.33, 0.0),
-    V(0.94, 1.19, 0.06),
-    V(0.99, 1.02, 0.13),
-    V(1.03, 0.76, 0.2),
-    V(0.98, 0.48, 0.3),
-    FC[5].clone(),
-    V(0.73, 0.195, 0.53),
-    V(0.6, 0.165, 0.62),
-  ].map(toLocal);
+    V(0.73, 1.57, -0.12),
+    V(0.87, 1.43, -0.05),
+    V(0.99, 1.23, 0.03),
+    V(1.07, 0.99, 0.11),
+    V(1.1, 0.76, 0.18),
+    V(1.06, 0.52, 0.26),
+    V(0.97, 0.32, 0.36),
+    V(0.88, 0.2, 0.47),
+    V(0.77, 0.15, 0.6),
+].map(toLocal);
   const mainCurve = new THREE.CatmullRomCurve3(mainPts, false, 'centripetal');
 
   // the head axis (for "outward") at the blade's height
@@ -73,7 +73,7 @@ export function build(ctx) {
     return V(-J.x, p.y, s.zc - J.z);
   };
   /** blade face normal: outward from the head, turned forward */
-  const faceUp = (curve, fwdK = 0.55) => (t) => {
+  const faceUp = (curve, fwdK = 0.9) => (t) => {
     const p = curve.getPointAt(t);
     const a = axisAt(p);
     const out = V(p.x - a.x, 0, p.z - a.z).normalize();
@@ -92,7 +92,7 @@ export function build(ctx) {
     return k[k.length - 1][1];
   };
   // half width across the face / half thickness
-  const mainW = keys([[0, 0.004], [0.06, 0.032], [0.14, 0.054], [0.35, 0.064], [0.62, 0.062], [0.82, 0.047], [0.94, 0.024], [1, 0.002]]);
+  const mainW = keys([[0, 0.004], [0.06, 0.04], [0.16, 0.07], [0.38, 0.086], [0.62, 0.08], [0.82, 0.055], [0.94, 0.026], [1, 0.002]]);
   const mainH = keys([[0, 0.006], [0.08, 0.02], [0.3, 0.025], [0.7, 0.024], [0.9, 0.016], [1, 0.003]]);
 
   /** Lens / blade section with chamfered bevels (CCW, x across, y face). */
@@ -161,8 +161,8 @@ export function build(ctx) {
   const mergeP = mf.P.clone().addScaledVector(mf.B, inwardSign(T_MERGE) * mainW(T_MERGE) * 0.6);
   const innerCurve = new THREE.CatmullRomCurve3([
     knuckleC.clone(),
-    toLocal(V(0.78, 1.5, -0.06)),
-    toLocal(V(0.84, 1.36, -0.04)),
+    toLocal(V(0.75, 1.5, -0.08)),
+    toLocal(V(0.86, 1.34, -0.02)),
     mergeP,
   ], false, 'centripetal');
   const innerW = keys([[0, 0.022], [0.15, 0.03], [0.6, 0.032], [0.9, 0.03], [1, 0.022]]);
