@@ -4,7 +4,8 @@
 
 A textless Next.js landing page that renders a procedural, rigged, animatable
 3D Ultron bust (crown -> collarbones) with three.js. Reference images live in
-`reference/` (`ultron-front.png`, `ultron-threequarter.webp`).
+`reference/` (`ultron-front.png`, `ultron-threequarter.webp`, `ultron-poster-34.png`,
+`ultron-film-front.png`, `ultron-film-34.png`).
 
 ## Layout
 

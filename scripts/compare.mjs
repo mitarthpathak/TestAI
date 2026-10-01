@@ -41,6 +41,11 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>
     ${cell(b64(path.join(refDir, 'ultron-threequarter.webp')), 'REFERENCE 3/4')}
     ${cell(b64(path.join(dir, 'threequarter.png')), `render 3/4 (${tag})`)}
   </div>
+  <div class="row">
+    ${cell(b64(path.join(refDir, 'ultron-poster-34.png')), 'REFERENCE poster 3/4')}
+    ${cell(b64(path.join(refDir, 'ultron-film-front.png')), 'REFERENCE film')}
+    ${cell(b64(path.join(refDir, 'ultron-film-34.png')), 'REFERENCE film 3/4')}
+  </div>
 </body></html>`;
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
