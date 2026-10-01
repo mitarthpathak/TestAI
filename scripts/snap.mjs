@@ -76,7 +76,7 @@ for (const view of views) {
   const t1 = Date.now();
   await page.evaluate(async (v) => { window.__ULTRON__.setView(v); await window.__ULTRON__.frames(2); }, view);
   const file = path.join(outDir, `${view}.png`);
-  await page.screenshot({ path: file });
+  await page.screenshot({ path: file, timeout: 180000 });
   // projected landmark pixels (used by scripts/overlay.mjs to align with the references)
   const marks = await page.evaluate(() => {
     const S = window.__ULTRON__;
