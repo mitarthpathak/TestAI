@@ -1,6 +1,6 @@
 # Ultron bust — target spec (read before touching a part)
 
-Targets, in priority order: `ultron-film-front.png`, `ultron-film-34.png` (the
+Targets, in priority order: **`ultron-face-close.png` (view `faceclose`) — the user's "make exactly this face" target for every face plate**, `ultron-concept-full.webp`, `ultron-film-body.png` (view `filmbody`), then `ultron-film-front.png`, `ultron-film-34.png` (the
 film frames), `ultron-threequarter.webp` (ILM concept, best detail),
 `ultron-front.png` (best orthographic proportions), `ultron-poster-34.png`.
 

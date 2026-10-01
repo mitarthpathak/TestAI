@@ -56,7 +56,7 @@ export const LANDMARKS = {
   chinBottom:   [0, -0.32, 0.6],
   chinButton:   [0, -0.14, 0.76],     // the round "button" on the front of the chin
   mouthCenter:  [0, 0.24, 0.88],      // mouth slit, on the forward muzzle
-  mouthHalfWidth: 0.17,
+  mouthHalfWidth: 0.15,
   noseTip:      [0, 0.5, 0.9],        // bottom of the central nose plate (just above the upper lip)
   browCenter:   [0, 1.1, 0.77],
   noseRidgeTop: [0, 1.07, 0.77],     // nose board top; the cranium crest starts here at the brow
@@ -336,6 +336,8 @@ export const VIEWS = {
   closeup:      { azimuth: 12, elevation: 2,   distance: 4.6, target: [0, 2.3, 0.2] },
   film34:       { azimuth: 41, elevation: -28, distance: 12.6, fov: 14, target: [0, 1.95, 0.1] },
   filmfront:    { azimuth: 34, elevation: -5,  distance: 12.9, fov: 14, target: [0, 1.9, 0.1] },
+  faceclose:    { azimuth: 0,  elevation: 0,   distance: 12, fov: 7.7, target: [0, 1.825, 0.6] },  // reference/ultron-face-close.png
+  filmbody:     { azimuth: 0,  elevation: -5,  distance: 14, fov: 16.8, target: [0, 1.48, 0.2] },  // reference/ultron-film-body.png
   back34:       { azimuth: 125, elevation: 6,  distance: 7.0, target: [0, 2.0, 0] },
   hero:         { azimuth: 0,  elevation: -4,  distance: 7.6, target: [0, 1.8, 0] },
 };

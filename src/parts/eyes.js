@@ -24,17 +24,53 @@ export const meta = {
   explode: [0, 0.1, 1.4],
 };
 
-// Eye-socket opening — same outline as faceplate.js (keep in sync).
-const SOCKET = { a: 0.17, bTop: 0.078, bBot: 0.09, n: 2.6 };
+// Eye-socket opening (shared with eyes.js — keep in sync). Almond outline in
+// eye-local units (o = outward from the nose, v = up), measured from the face
+// close-up: outer corner raised, inner corner drawn down toward the nose.
+const SOCKET_PTS = [
+  [0.162, 0.053], [0.099, 0.084], [0.0, 0.099], [-0.104, 0.084], [-0.18, 0.04],
+  [-0.218, -0.112], [-0.129, -0.137], [0.0, -0.099], [0.099, -0.061],
+];
+const SOCKET_SCALE = 0.95;
+let _lut = null;
+function socketLUT() {
+  if (_lut) return _lut;
+  const P = SOCKET_PTS, n = P.length, dense = [];
+  const cr = (a, b, c, d, t) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (-a + 3 * b - 3 * c + d) * t * t * t);
+  for (let i = 0; i < n; i++) {
+    const p0 = P[(i - 1 + n) % n], p1 = P[i], p2 = P[(i + 1) % n], p3 = P[(i + 2) % n];
+    for (let j = 0; j < 48; j++) {
+      const t = j / 48;
+      dense.push([cr(p0[0], p1[0], p2[0], p3[0], t), cr(p0[1], p1[1], p2[1], p3[1], t)]);
+    }
+  }
+  const cum = [0];
+  for (let i = 1; i <= dense.length; i++) {
+    const a = dense[i - 1], b = dense[i % dense.length];
+    cum.push(cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1]));
+  }
+  const total = cum[cum.length - 1], N = 720, out = [];
+  let k = 0;
+  for (let i = 0; i < N; i++) {
+    const L = (i / N) * total;
+    while (cum[k + 1] < L) k++;
+    const f = (L - cum[k]) / Math.max(1e-9, cum[k + 1] - cum[k]);
+    const a = dense[k], b = dense[(k + 1) % dense.length];
+    out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
+  }
+  _lut = out;
+  return out;
+}
+/** Socket outline point: t in [0, 2PI) (0 = outer corner, then over the top), k = radial scale. */
 function socketPoint(anatomy, side, t, k = 1) {
-  const L = anatomy.LANDMARKS;
-  const c = Math.cos(t), s = Math.sin(t);
-  const e = 2 / SOCKET.n;
-  const lx = SOCKET.a * k * Math.sign(c) * Math.pow(Math.abs(c), e);
-  const ly = (s >= 0 ? SOCKET.bTop : SOCKET.bBot) * k * Math.sign(s) * Math.pow(Math.abs(s), e);
-  const th = side * L.socketTilt;
-  const ex = L.eyeL[0] * side, ey = L.eyeL[1];
-  return [ex + lx * Math.cos(th) - ly * Math.sin(th), ey + lx * Math.sin(th) + ly * Math.cos(th)];
+  const L = socketLUT(), N = L.length;
+  let f = ((t / (2 * Math.PI)) % 1 + 1) % 1 * N;
+  const i = Math.floor(f) % N, j = (i + 1) % N;
+  f -= Math.floor(f);
+  const o = (L[i][0] + (L[j][0] - L[i][0]) * f) * SOCKET_SCALE * k;
+  const v = (L[i][1] + (L[j][1] - L[i][1]) * f) * SOCKET_SCALE * k;
+  const e = anatomy.LANDMARKS.eyeL;
+  return [side * (e[0] + o), e[1] + v];
 }
 
 const LENS_R = 0.068;      // a touch larger than LANDMARKS.eyeRadius (film frames)
@@ -69,26 +105,30 @@ void main() {
   float a = atan(p.y, p.x);
   float aa = fwidth(r) * 0.75 + 1e-4;
   float pr = r / max(0.3, uPupil);
-  // base layers, outside -> in
-  vec3 deep = vec3(0.75, -0.09, -0.075);
-  vec3 red = vec3(5.0, -0.62, -0.5);
-  vec3 orange = vec3(12.0, 0.7, 0.45);
-  vec3 hot = vec3(30.0, 10.0, 8.0);
-  vec3 col = deep;
-  col = mix(col, red, 1.0 - smoothstep(0.66 - aa, 0.66 + aa, pr));
-  // radial slits in the red ring (segmented arcs)
-  float seg = abs(fract(a / (2.0 * PI) * 14.0 + 0.25) - 0.5);
-  float slit = (1.0 - smoothstep(0.05, 0.09, seg)) * smoothstep(0.3, 0.34, pr) * (1.0 - smoothstep(0.54, 0.58, pr));
-  col *= 1.0 - 0.75 * slit;
-  col = mix(col, orange, 1.0 - smoothstep(0.27 - aa, 0.27 + aa, pr));
-  col = mix(col, hot, 1.0 - smoothstep(0.12, 0.3, pr));
-  // dark concentric rings (lens / aperture structure)
-  float d = ring(pr, 0.29, 0.018, aa);
-  d = max(d, ring(r, 0.62, 0.028, aa));
-  d = max(d, ring(r, 0.74, 0.012, aa) * 0.7);
-  d = max(d, ring(r, 0.84, 0.01, aa) * 0.6);
-  d = max(d, smoothstep(0.9, 0.99, r));
-  col *= 1.0 - 0.88 * d;
+  // face close-up: pink-red disc with a hot white-pink outer rim, concentric
+  // red rings, tick marks and a small white "pupil" ring near the top
+  vec3 deep = vec3(0.9, -0.09, -0.075);
+  vec3 red = vec3(4.2, -0.45, -0.3);
+  vec3 pink = vec3(6.0, 0.5, 0.6);
+  vec3 white = vec3(9.0, 3.6, 3.6);
+  vec3 col = mix(red, pink, smoothstep(0.2, 0.8, r));
+  // concentric darker red rings
+  float d = ring(r, 0.3, 0.03, aa) * 0.6;
+  d = max(d, ring(r, 0.56, 0.035, aa) * 0.7);
+  d = max(d, ring(r, 0.74, 0.02, aa) * 0.55);
+  // radial ticks in the band between the rings
+  float seg = abs(fract(a / (2.0 * PI) * 18.0 + 0.25) - 0.5);
+  float tick = (1.0 - smoothstep(0.06, 0.1, seg)) * smoothstep(0.6, 0.63, r) * (1.0 - smoothstep(0.7, 0.73, r));
+  d = max(d, tick * 0.8);
+  col *= 1.0 - d;
+  // hot white-pink outer rim
+  col = mix(col, white, ring(r, 0.86, 0.065, aa));
+  // small white pupil ring near the top centre
+  vec2 q = (p - vec2(0.0, 0.4)) / max(0.3, uPupil);
+  float qr = length(q);
+  col = mix(col, white, 1.0 - smoothstep(0.17 - aa, 0.17 + aa, qr));
+  col = mix(col, red * 0.5, ring(qr, 0.22, 0.035, aa));
+  col = mix(col, deep, smoothstep(0.95, 1.0, r));
   // tiny cover-glass glint
   float gl = exp(-dot(p - vec2(-0.32, 0.4), p - vec2(-0.32, 0.4)) * 90.0);
   col += vec3(1.4, 1.0, 0.9) * gl;
@@ -113,13 +153,13 @@ export function build(ctx) {
   const surfZ = (x, y) => A.headFrontZ(x, y) ?? 0.5;
 
   // ------------------------------------------------------------ materials
-  const lidMat = M.get('darkMetal', { panel: 16, seed: 43, lineWidth: 0.002, roughness: 0.34, color: 0x26292e, side: THREE.DoubleSide });
+  const lidMat = M.get('darkMetal', { panel: 16, seed: 43, lineWidth: 0.002, roughness: 0.32, color: 0x30343a, side: THREE.DoubleSide });
   const leafMat = M.get('gunmetal', { panel: 14, seed: 47, lineWidth: 0.002, roughness: 0.3, side: THREE.DoubleSide });
-  const edgeMat = M.get('chrome', { roughness: 0.2 });
+  const edgeMat = M.get('darkMetal', { roughness: 0.3, color: 0x34383e });
   const ringMat = M.get('darkMetal', { roughness: 0.26, metalness: 1.0 });
   const cavityMat = M.get('cavity', { side: THREE.DoubleSide, color: 0x040405, roughness: 0.85 });
   const rimMat = M.get('gunmetal', { roughness: 0.22 });
-  const rimGlowMat = M.get('redAccent', { intensity: 1.5 });
+  const rimGlowMat = M.get('redAccent', { intensity: 3.0 });
 
   const gain = new THREE.Color(1, 1, 1);
   const registerGlow = (mat) => {
@@ -205,12 +245,12 @@ export function build(ctx) {
       // red-lit lower lip of the socket (poster)
       const low = [];
       for (let i = 0; i <= 40; i++) {
-        const t = Math.PI * (1.08 + 0.84 * (i / 40));
-        const [x, y] = socketPoint(A, side, t, 0.955);
-        low.push(V(x, y, surfZ(x, y) - 0.06));
+        const t = Math.PI * 2 * (0.36 + 0.52 * (i / 40)); // inner-top -> inner corner -> bottom
+        const [x, y] = socketPoint(A, side, t, 0.995);
+        low.push(V(x, y, surfZ(x, y) - 0.022));
       }
-      const gg = geo.sweptSection(new THREE.CatmullRomCurve3(low), geo.roundedSection(0.0028, 0.0028, 2, 8), {
-        steps: 60, up: V(0, 0, 1), scale: (t) => Math.min(1, t * 5, (1 - t) * 5),
+      const gg = geo.sweptSection(new THREE.CatmullRomCurve3(low), geo.roundedSection(0.007, 0.007, 2, 8), {
+        steps: 80, up: V(0, 0, 1), scale: (t) => Math.min(1, t * 5, (1 - t) * 5),
       });
       hs.add(ctx.mesh(gg, rimGlowMat, `eyes.rimGlow.${key}`));
     }
@@ -224,7 +264,7 @@ export function build(ctx) {
 
     const lidFrame = new THREE.Group();
     lidFrame.name = `eyes.lidFrame.${key}`;
-    lidFrame.rotation.z = side * A.LANDMARKS.socketTilt; // lid line follows the slanted socket
+    lidFrame.rotation.z = side * A.LANDMARKS.socketTilt * 0.5; // lid line follows the slanted socket
     frame.add(lidFrame);
     const upperPivot = new THREE.Group();
     upperPivot.name = `eyes.lidUpperPivot.${key}`;
@@ -247,6 +287,7 @@ export function build(ctx) {
     const iris = new THREE.Group();
     iris.name = `eyes.iris.${key}`;
     iris.position.set(0, 0, LENS_Z - LOOK_C);
+    iris.scale.set(1.0, 0.68, 1); // wide, flattened iris (face close-up)
     look.add(iris);
     iris.add(ctx.mesh(bezelGeo, ringMat, `eyes.lensBezel.${key}`));
     const lens = ctx.mesh(lensGeo, lensMat, `eyes.lens.${key}`);
