@@ -127,7 +127,7 @@ export async function createStage(container, { flags, onStatus } = {}) {
   ao.setQualityMode(capture ? 'High' : 'Medium');
   composer.addPass(ao);
   const bloom = new BloomEffect({
-    luminanceThreshold: 5.0,
+    luminanceThreshold: 7.0, // only the HDR eyes bloom; specular glints stay crisp on black
     luminanceSmoothing: 0.3,
     intensity: 2.6,
     mipmapBlur: true,
