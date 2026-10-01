@@ -65,9 +65,9 @@ export function build(ctx) {
     disc(-24, 0.52, 0.05),
     disc(-58, 0.46, 0.09),
     disc(-86, 0.42, 0.13),
-    disc(-106, 0.39, 0.2),
-    disc(-122, 0.38, 0.28),
-    disc(-136, 0.4, 0.37),
+    disc(-104, 0.39, 0.17),
+    disc(-120, 0.37, 0.21),
+    disc(-133, 0.36, 0.24),
   ].map(toLocal);
   const mainCurve = new THREE.CatmullRomCurve3(mainPts, false, 'centripetal');
 
