@@ -30,7 +30,7 @@ export function build(ctx) {
   const bright = M.get('chrome', { roughness: 0.15, panel: 2.2, seed: 9, lineWidth: 0.003, lineDepth: 0.7 });
   const gun = M.get('gunmetal', { panel: 4.2, seed: 13, lineWidth: 0.0035, lineDepth: 0.8 });
   // below the bloom threshold: a warm red seam light, not a glow source
-  const glowSeam = M.get('redAccent', { intensity: 1.2 });
+  const glowSeam = M.get('redAccent', { intensity: 2.0 });
 
   // rails through control points: [x, y] = front-view x (converted to the
   // head angle u), or { u, y } for points that wrap round the side.
@@ -65,11 +65,11 @@ export function build(ctx) {
   // eyes, widening into a blocky lower nose that stops above the upper lip
   const noseEdge = [
     [0.024, 1.1], [0.056, 1.03], [0.07, 0.95], [0.08, 0.86], [0.097, 0.76],
-    [0.122, 0.64], [0.147, 0.52], [0.163, 0.42], [0.168, 0.34], [0.162, 0.278],
+    [0.11, 0.64], [0.128, 0.52], [0.14, 0.42], [0.145, 0.34], [0.14, 0.278],
   ];
   const noseY = (t) => lerp(1.1, 0.278, t);
   // projection of the nose ridge above the skin (shared by the bridge strip)
-  const noseH = (y) => 0.022 + 0.058 * sm(y, 1.06, 0.66) + 0.036 * sm(y, 0.74, 0.46) - 0.026 * sm(y, 0.4, 0.28);
+  const noseH = (y) => 0.024 + 0.062 * sm(y, 1.06, 0.66) + 0.04 * sm(y, 0.74, 0.46) - 0.024 * sm(y, 0.38, 0.28);
   {
     const inner = pivot('faceplate.nose', surf(0, 1.08));
     const g = ribbonPlate(THREE, geo, {
@@ -79,21 +79,24 @@ export function build(ctx) {
         const y = noseY(t);
         const e = Math.abs(2 * s - 1);
         // two planar facets meeting at the central keel; flatter (blockier) low down
-        const k = lerp(0.62, 0.34, sm(y, 0.9, 0.5));
-        return noseH(y) * (1 - k * e);
+        // flat-fronted muzzle: a broad flat face with sharply chamfered sides
+        const k = lerp(0.55, 0.12, sm(y, 0.9, 0.55));
+        const chamfer = sm(e, 0.72, 1.0) * lerp(0.2, 0.5, sm(y, 0.9, 0.55));
+        return noseH(y) * (1 - k * e - chamfer);
       },
     });
     inner.add(ctx.mesh(g, bright, 'faceplate.nose'));
 
     // raised keel strip running down the centre of the nose, with a notch at the tip
-    const keelEdge = [[0.012, 1.0], [0.018, 0.9], [0.024, 0.75], [0.032, 0.6], [0.04, 0.47], [0.044, 0.39]];
-    const keelY = (t) => lerp(1.0, 0.39, t);
+    const keelEdge = [[0.012, 1.02], [0.019, 0.9], [0.024, 0.75], [0.029, 0.6], [0.034, 0.47], [0.037, 0.38], [0.034, 0.31]];
+    const keelY = (t) => lerp(1.02, 0.31, t);
     const kg = ribbonPlate(THREE, geo, {
       chart, railA: rail(keelEdge, -1), railB: rail(keelEdge, 1),
       segS: 10, segT: 40, offset: 0.006, thickness: 0.05, bevel: 0.006, gap: 0.0, gap0: 0.0, gap1: 0.0,
       lift: (s, t) => {
         const e = Math.abs(2 * s - 1);
-        return noseH(keelY(t)) + 0.012 + 0.006 * (1 - e * e) - 0.006 * sm(t, 0.82, 1.0);
+        // tall, sharp-shouldered central ridge with a stepped notch near the tip
+        return noseH(keelY(t)) + 0.02 + 0.008 * (1 - e * e) - 0.008 * sm(t, 0.86, 1.0);
       },
     });
     inner.add(ctx.mesh(kg, M.get('chrome', { roughness: 0.2 }), 'faceplate.nose.bridge'));
@@ -125,15 +128,18 @@ export function build(ctx) {
 
     // brow: lower rail frames the socket top; the plate is a wedge whose thick,
     // crisp lower edge overhangs the eye (the angry brow mass)
-    const browLow = [[0.112, 0.89], [0.136, 0.956], [0.176, 1.004], [0.24, 1.04], [0.32, 1.066], [0.4, 1.074], [0.466, 1.064], [0.515, 1.026], ...K];
+    // lower rail = upper edge of the eyes' heavy brow ridge (eyes.brow), so the
+    // two tile instead of stacking: the ridge juts, this plate steps back above it
+    const browLow = [[0.078, 0.962], [0.126, 1.05], [0.226, 1.12], [0.36, 1.16], [0.5, 1.146], [0.594, 1.064], [0.66, 1.05], { u: 1.2, y: 1.085 }];
     const browTop = [[0.06, 1.1], [0.13, 1.17], [0.24, 1.214], [0.36, 1.244], [0.47, 1.262], [0.56, 1.272], [0.64, 1.274], { u: 1.2, y: 1.268 }];
     const browIn = pivot(`faceplate.brow.${key}`, surf(0.62 * side, 1.1));
     const brow = ribbonPlate(THREE, geo, {
       chart, railA: rail(browLow, side), railB: rail(browTop, side),
-      segS: 12, segT: 56, offset: 0.03, thickness: 0.07, bevel: 0.008, gapA: 0.006, gapB: 0.006, gap0: 0.006, gap1: 0.006,
+      segS: 12, segT: 56, offset: 0.012, thickness: 0.07, bevel: 0.005, gapA: 0.008, gapB: 0.006, gap0: 0.006, gap1: 0.006,
       lift: (s, t) => {
-        const amp = (0.55 + 0.45 * sm(t, 0.0, 0.22)) * (1 - 0.7 * sm(t, 0.6, 1.0));
-        return 0.004 + 0.044 * (1 - s) * amp;
+        // flat stepped plate: a raised upper shelf and a lower recessed groove
+        const shelf = sm(s, 0.45, 0.52);
+        return 0.004 + 0.012 * shelf * (1 - 0.5 * sm(t, 0.7, 1.0));
       },
     });
     browIn.add(ctx.mesh(brow, plateMat, `faceplate.brow.${key}`));
@@ -158,7 +164,7 @@ export function build(ctx) {
     cheekIn.add(ctx.mesh(cheek, bright, `faceplate.cheekbone.${key}`));
 
     // maxilla: between the nose and the cheek disc, down to the upper lip line
-    const maxIn = [[0.128, 0.652], [0.15, 0.52], [0.165, 0.42], [0.17, 0.34], [0.166, 0.25]];
+    const maxIn = [[0.114, 0.652], [0.13, 0.52], [0.142, 0.42], [0.147, 0.34], [0.143, 0.25]];
     const maxOut = [[0.39, 0.652], [0.36, 0.6], [0.335, 0.56], [0.296, 0.5], [0.268, 0.44], [0.26, 0.39], [0.268, 0.33], [0.288, 0.275], [0.305, 0.245]];
     const maxInner = pivot(`faceplate.maxilla.${key}`, surf(0.25 * side, 0.62));
     const maxilla = ribbonPlate(THREE, geo, {
@@ -168,7 +174,25 @@ export function build(ctx) {
     });
     maxInner.add(ctx.mesh(maxilla, gun, `faceplate.maxilla.${key}`));
 
-    // red-lit strip deep inside seam K (the reference's glowing seams behind the eye)
+    // red-lit strips deep inside seams: K (behind the eye), the brow seam above
+    // the eye ridge, and the upper nose flank (poster ref)
+    const glowStrip = (pts, t0, t1, name) => {
+      const r = rail(pts, side);
+      const P = new THREE.Vector3(), N = new THREE.Vector3();
+      const cp = [], nrm = [];
+      for (let i = 0; i <= 24; i++) {
+        const [u, y] = r(t0 + (t1 - t0) * (i / 24));
+        chart(u, y, P, N);
+        cp.push(P.clone().addScaledVector(N, 0.006));
+        nrm.push(N.clone());
+      }
+      const g = geo.sweptSection(new THREE.CatmullRomCurve3(cp), geo.roundedSection(0.0032, 0.007, 2, 8), {
+        steps: 48, up: (t) => nrm[Math.round(t * 24)], scale: (t) => [1, Math.min(1, t * 10, (1 - t) * 10)],
+      });
+      root.add(ctx.mesh(g, glowSeam, `faceplate.${name}.${key}`));
+    };
+    glowStrip(browLow, 0.08, 0.86, 'browGlow');
+    glowStrip(noseEdge, 0.02, 0.32, 'noseGlow');
     {
       const r = rail(K, side);
       const P = new THREE.Vector3(), N = new THREE.Vector3();
