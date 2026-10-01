@@ -56,7 +56,7 @@ export const LANDMARKS = {
   chinBottom:   [0, -0.32, 0.6],
   chinButton:   [0, -0.14, 0.76],     // the round "button" on the front of the chin
   mouthCenter:  [0, 0.24, 0.88],      // mouth slit, on the forward muzzle
-  mouthHalfWidth: 0.25,
+  mouthHalfWidth: 0.17,
   noseTip:      [0, 0.5, 0.9],        // bottom of the central nose plate (just above the upper lip)
   browCenter:   [0, 1.1, 0.77],
   noseRidgeTop: [0, 1.07, 0.77],     // nose board top; the cranium crest starts here at the brow
@@ -68,7 +68,7 @@ export const LANDMARKS = {
   cheekDiscL:   JOINTS.cheekL.pos,
   cheekDiscR:   JOINTS.cheekR.pos,
   cheekDiscRadius: 0.26,               // recessed turbine cavity; the rim rings reach ~0.4
-  cheekDiscNormalL: [0.85, -0.06, 0.52], // disc faces mostly sideways (~60 deg off the face axis)
+  cheekDiscNormalL: [0.9, -0.06, 0.43], // disc faces mostly sideways (~60 deg off the face axis)
   jawHinge:     JOINTS.jaw.pos,
   templeL:      [0.74, 1.25, 0.2],
   templeR:      [-0.74, 1.25, 0.2],
