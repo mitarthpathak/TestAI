@@ -13,8 +13,8 @@
  *   neck.throat.<i>                central segmented throat column (trachea
  *                                  rings): .plate .face .keel .ring
  *   neck.throat.tip                spike pointing into the sternal notch
- *   neck.chevron.<L|R>             V plates tucked under the chin
- *   neck.vplate.<L|R>.<i>          diagonal V lames between throat and pillars
+ *   neck.chevron.<L|R>             under-chin plates wrapped on the socket (head joint)
+ *   neck.wrap.<L|R>.<i>            long side plates between throat and pillars
  *   neck.pillar.<L|R>.<i>          thick SCM-like side pillars (stacked long
  *                                  armour segments, ribbed, dark gaps):
  *                                  .plate .strip.<k> .rib.<k> .band .collar
@@ -211,11 +211,11 @@ export function build(ctx) {
   const coreMat = M.get('darkMetal');
   const deep = M.get('darkMetal', { roughness: 0.55, color: 0x1e2024 });
   const cavity = M.get('cavity');
-  const plateMat = M.get('chrome', { panel: 4.5, seed: 91, lineWidth: 0.004 });
-  const plateAlt = M.get('gunmetal', { panel: 4.5, seed: 92, lineWidth: 0.0045 });
+  const plateMat = M.get('chrome', { panel: 2.4, seed: 91, lineWidth: 0.0035, roughness: 0.22 });
+  const plateAlt = M.get('chrome', { panel: 2.4, seed: 92, lineWidth: 0.0035, roughness: 0.27 });
   const bright = M.get('chrome', { roughness: 0.16 });
-  const pillarMat = M.get('chrome', { panel: 5, seed: 93, lineWidth: 0.004, roughness: 0.24, angle: 1.5708 });
-  const pillarAlt = M.get('gunmetal', { panel: 5, seed: 95, lineWidth: 0.004, angle: 1.5708 });
+  const pillarMat = M.get('chrome', { panel: 2.2, seed: 93, lineWidth: 0.0035, roughness: 0.2, angle: 1.5708 });
+  const pillarAlt = M.get('chrome', { panel: 2.2, seed: 95, lineWidth: 0.0035, roughness: 0.26, angle: 1.5708 });
   const pistonMat = M.get('gunmetal', { roughness: 0.38 });
   const cableMat = M.get('cable');
   const napeMat = M.get('gunmetal', { panel: 3.6, seed: 97, lineWidth: 0.005 });
@@ -243,26 +243,24 @@ export function build(ctx) {
 
   // ------------------------------------------------------- throat column
   // centre line of the column: leans forward toward the chin
-  const colZ = (y) => lerp(0.24, 0.33, THREE.MathUtils.smoothstep(y, 0.2, 1.15));
+  const colZ = (y) => lerp(0.24, 0.43, THREE.MathUtils.smoothstep(y, 0.3, 1.08));
   const throat = [];
   const throatSegs = [
-    // [y0, y1, halfWidth, halfDepth, onHead]
-    [0.3, 0.44, 0.14, 0.09, false],
-    [0.46, 0.6, 0.15, 0.095, false],
-    [0.62, 0.76, 0.155, 0.098, false],
-    [0.78, 0.92, 0.155, 0.098, false],
-    [0.94, 1.07, 0.15, 0.092, true],
-    [1.09, 1.2, 0.135, 0.085, true],
+    // [y0, y1, halfWidth, halfDepth, onHead] — few long, calm plates
+    [0.22, 0.62, 0.145, 0.092, false],
+    [0.64, 0.86, 0.155, 0.098, false],
+    [0.87, 1.05, 0.155, 0.096, true],
+    [1.07, 1.16, 0.15, 0.09, true],
   ];
   // recessed dark trachea tube behind the plates
   root.add(ctx.mesh(puck(THREE, geo, seLoop(0.1, 0.075, 2.4, 28), segProfile(0.2, 1.0, 0.02), 0, 0.22), cavity, 'neck.throat.core'));
-  headRoot.add(ctx.mesh(puck(THREE, geo, seLoop(0.1, 0.075, 2.4, 28), segProfile(0.88, 1.25, 0.02), 0, 0.27), cavity, 'neck.throat.coreTop'));
+  headRoot.add(ctx.mesh(puck(THREE, geo, seLoop(0.1, 0.075, 2.4, 28), segProfile(0.85, 1.2, 0.02), 0, 0.36), cavity, 'neck.throat.coreTop'));
   throatSegs.forEach(([y0, y1, w, d, onHead], i) => {
     const yc = (y0 + y1) / 2;
     const g = new THREE.Group();
     g.name = `neck.throat.${i}`;
     g.position.set(0, yc, colZ(yc));
-    g.rotation.x = 0.12; // follow the forward lean (top toward +Z)
+    g.rotation.x = 0.2; // follow the forward lean (top toward +Z)
     const hh = (y1 - y0) / 2;
     // main rounded ring plate (wraps round the sides, slightly crowned front)
     g.add(ctx.mesh(puck(THREE, geo, rrLoop(w, d, 0.05, 5, 3), segProfile(-hh, hh, 0.018, 0.006), 0, 0), plateMat, `neck.throat.${i}.plate`));
@@ -298,22 +296,31 @@ export function build(ctx) {
   };
   for (const side of [1, -1]) {
     const key = side > 0 ? 'L' : 'R';
-    // chevron under the chin: from the throat top out/up to behind the jaw
-    vLame(side, 0.05, 0.86, 0.5, 1.07, 0.15, 0.4, `neck.chevron.${key}`, plateMat, headRoot, 0.06);
-    // V lames lower down (front ref: two V's pointing at the sternum)
-    vLame(side, 0.15, 0.64, 0.46, 0.84, 0.13, 0.32, `neck.vplate.${key}.0`, plateAlt, root);
-    vLame(side, 0.15, 0.4, 0.46, 0.58, 0.13, 0.3, `neck.vplate.${key}.1`, plateMat, root);
+    // long vertical side plates between the throat column and the pillars;
+    // the outer ends ride a little higher (soft V of the front ref)
+    // under-chin: plates wrapped on the socket so they tuck in behind the
+    // throat column and up under the jaw (no flat edge standing out)
+    {
+      const u0 = side > 0 ? 0.22 : -1.05, u1 = side > 0 ? 1.05 : -0.22;
+      const g = geo.shellPatch({
+        surface: sockSurf.surface, normal: sockSurf.normal, u0, u1, y0: 0.88, y1: 1.26,
+        offset: 0.05, thickness: 0.055, bevel: 0.02, gap: 0.012, segU: 16, segV: 10,
+      });
+      const m = ctx.mesh(g, plateMat, `neck.chevron.${key}`);
+      headRoot.add(m);
+      addSwell(m, V(0.6 * side, 0, 0.8), 0.008);
+    }
   }
 
   // ------------------------------------------- wrap plates (core sides)
   // layered plates on the dark core between the throat and the pillars
-  [[0.28, 0.5], [0.52, 0.74], [0.76, 1.0]].forEach(([y0, y1], r) => {
+  [[0.26, 0.78], [0.8, 0.98]].forEach(([y0, y1], r) => {
     for (const side of [1, -1]) {
       const key = side > 0 ? 'L' : 'R';
-      const u0 = side > 0 ? 0.42 : -1.15, u1 = side > 0 ? 1.15 : -0.42;
+      const u0 = side > 0 ? 0.24 : -1.15, u1 = side > 0 ? 1.15 : -0.24;
       const g = geo.shellPatch({
         surface: coreSurf.surface, normal: coreSurf.normal, u0, u1, y0, y1,
-        offset: 0.03 + (r % 2) * 0.01, thickness: 0.045, bevel: 0.014, gap: 0.012, segU: 14, segV: 8,
+        offset: 0.04 + (r % 2) * 0.012, thickness: 0.05, bevel: 0.018, gap: 0.014, segU: 16, segV: 10,
       });
       const m = ctx.mesh(g, r % 2 ? pillarMat : plateMat, `neck.wrap.${key}.${r}`);
       root.add(m);
@@ -336,7 +343,7 @@ export function build(ctx) {
     axis.normalize();
     const q = new THREE.Quaternion().setFromUnitVectors(UP, axis);
     // [s0, s1] along the axis (0 = bottom), onHead
-    const segs = [[0.0, 0.25, false], [0.275, 0.62, false], [0.645, 0.98, false], [0.93, 1.1, true]];
+    const segs = [[0.0, 0.28, false], [0.3, 0.9, false], [0.87, 1.02, true]];
     // dark inner tube visible in the gaps
     const tube = new THREE.Group();
     tube.position.copy(bot);
@@ -355,11 +362,11 @@ export function build(ctx) {
       holder.add(sg);
       const taper = onHead ? 0.86 : 1 - i * 0.02;
       const w = PIL.w * taper, d = PIL.d * taper;
-      sg.add(ctx.mesh(puck(THREE, geo, seLoop(w, d, 2.7, 40), segProfile(-hh, hh, 0.026, 0.014), 0, 0), i % 2 ? pillarMat : pillarAlt, `${name}.plate`));
+      sg.add(ctx.mesh(puck(THREE, geo, seLoop(w, d, 4, 44), segProfile(-hh, hh, onHead ? 0.07 : 0.026, onHead ? 0 : 0.014), 0, 0), i % 2 ? pillarMat : pillarAlt, `${name}.plate`));
       // vertical ribbing: two long front strips split by a dark groove, one on the outside
-      const strips = [[-0.055, 0.05], [0.055, 0.05]];
+      const strips = [[-0.07, 0.062], [0.07, 0.062]];
       strips.forEach(([ox, sw], k) => {
-        const lo = -hh + 0.03 + (k === (side > 0 ? 0 : 1) ? 0.04 * hh : 0);
+        const lo = -hh + 0.03;
         sg.add(ctx.mesh(puck(THREE, geo, rrLoop(sw, 0.02, 0.012, 3, 2), segProfile(lo, hh - 0.03, 0.008), ox, d - 0.016), k ? pillarMat : bright, `${name}.strip.${k}`));
       });
       sg.add(ctx.mesh(puck(THREE, geo, rrLoop(0.022, d * 0.7, 0.012, 3, 2), segProfile(-hh + 0.04, hh - 0.04, 0.008), (w - 0.014) * side, -0.01), pillarMat, `${name}.rib.0`));
@@ -397,7 +404,7 @@ export function build(ctx) {
     pistons.push({ bottom: V(...bottom), topAnchor, barrelPivot, rodPivot, barrelMesh: bm, glandMesh: gm, barrelLen });
   };
   for (const side of [1, -1]) {
-    makePiston(side, 0, [0.3 * side, 0.2, 0.2], [0.3 * side, 1.12, 0.22], 0.028, 0.48, 0.6);
+    // (front piston removed: the side plates now close the throat)
     makePiston(side, 1, [0.42 * side, 0.3, -0.36], [0.4 * side, 1.5, -0.32], 0.04, 0.55, 0.75);
   }
 

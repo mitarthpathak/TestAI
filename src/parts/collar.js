@@ -9,22 +9,20 @@
  *
  * Sub-meshes (L = model's left, +X):
  *   collar.core                    dark under-body (open in front of the neck)
- *   collar.trapezius.<L|R>.<i>     overlapping trapezius lames (neck -> shoulder)
- *   collar.trapezius.<L|R>.rib.<k> raised ridges along the trapezius
- *   collar.trapezius.<L|R>.band    thick rolled front edge
+ *   collar.trapezius.<L|R>.<i>     long layered lames along the slope (0 back .. 2 front)
+ *   collar.trapezius.<L|R>.under   dark under-body seen in the lame seams
+ *   collar.trapezius.<L|R>.band    bright rolled front edge (the sloped line in front view)
  *   collar.shoulder.<L|R>.<i>      layered rounded shoulder armour (pivot group
  *                                  at the shoulder centre: collar.shoulderPivot.<L|R>)
- *   collar.recess.<L|R>            dark supraclavicular recess, .rib.<k> ribs
- *   collar.actuator.<L|R>.<i>      horizontal ribbed actuators in the recess
- *   collar.clavicle.<L|R>          collarbone bars
- *   collar.pec.<L|R>.<i>           layered pectoral plates
+ *   collar.recess.<L|R>            dark supraclavicular recess, .lame.<i> stepped front lames
+ *   collar.clavicle.<L|R>          collarbone bars (outside the neck pillars)
+ *   collar.pec.<L|R>.<i>           big pectoral plates (0 inner, 1 outer, 2/3 lower, darker)
  *   collar.back.<L|R>.<i>          upper back plates
  *   collar.sternum / collar.notch  centre plate with the sternal notch + centre line
  *
  * Params
  *   breathe  0..1   chest plates lift / spread
  *   shrug   -1..1   trapezius + shoulders rise / drop
- *   actuate  0..1   recess actuators extend
  *   idle     0..1   built-in breathing amount
  */
 export const meta = {
@@ -195,6 +193,7 @@ function sheet(THREE, F, segS, segT, out, keep = null) {
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
 
 export function build(ctx) {
   const { THREE, geo, materials: M } = ctx;
@@ -205,12 +204,12 @@ export function build(ctx) {
   // materials
   const coreMat = M.get('darkMetal');
   const deepMat = M.get('darkMetal', { roughness: 0.55, color: 0x1c1d20 });
-  const trapMat = M.get('chrome', { panel: 3.2, seed: 81, lineWidth: 0.0045, roughness: 0.26 });
+  const trapMat = M.get('chrome', { panel: 3.2, seed: 81, lineWidth: 0.0045, roughness: 0.24 });
   const trapAlt = M.get('gunmetal', { panel: 3.2, seed: 82, lineWidth: 0.0045 });
   const pecMat = M.get('gunmetal', { panel: 2.4, seed: 83, lineWidth: 0.004, lineDepth: 0.8 });
   const pecAlt = M.get('chrome', { panel: 2.6, seed: 84, lineWidth: 0.004, lineDepth: 0.8, roughness: 0.28 });
+  const lowMat = M.get('gunmetal', { panel: 2.4, seed: 85, lineWidth: 0.004, lineDepth: 0.8, color: 0x3a3f45, roughness: 0.4 });
   const bright = M.get('chrome', { roughness: 0.17 });
-  const mechMat = M.get('gunmetal', { roughness: 0.42 });
 
   // ---------------------------------------------------------- torso body
   const torso = geo.profileSurface([
@@ -233,26 +232,36 @@ export function build(ctx) {
     return Math.sign(x) * Math.asin(Math.pow(r, s.n / 2));
   };
   const radial = (p) => V(p.x, 0, p.z + 0.05);
-  // collarbone height: low at the sternal notch, rising toward the shoulder
+  // collarbone height: low between the neck pillars (they plunge into the
+  // chest behind the pecs), rising outside them toward the shoulder
   const clavY = (x) => {
     const a = Math.abs(x);
-    return 0.34 + 0.24 * smooth(0.05, 1.25, a) - 0.04 * smooth(1.35, 1.7, a);
+    return 0.1 + 0.27 * smooth(0.3, 1.0, a) + 0.07 * smooth(0.95, 1.45, a);
   };
 
   // ------------------------------------------------------ trapezius frame
-  const TX0 = 0.4, TX1 = 1.6;
+  // Crest slopes from high beside the neck (body y ~1.4, behind the pillars)
+  // down and out to the shoulder caps. t runs back (0) -> crest (TC) -> front (1).
+  const TX0 = 0.42, TX1 = 1.64, TC = 0.68;
   const tu = (x) => clamp01((Math.abs(x) - TX0) / (TX1 - TX0));
-  const topY = (x) => 0.9 + 0.27 * Math.pow(1 - tu(x), 1.2);
-  const zFront = (x) => 0.1 + 0.16 * tu(x);
-  const zBack = (x) => -0.56 - 0.06 * tu(x);
-  /** trapezius surface: s across (neck -> shoulder), t back -> front */
+  const topY = (x) => Math.min(1.36, 1.0 + 0.5 * Math.pow(1 - tu(x), 1.5));
+  const zFront = (x) => -0.12 + 0.32 * tu(x);
+  const zBack = () => -0.62;
   const trapPoint = (side, s, t, target, lift = 0) => {
     const x = lerp(TX0, TX1, s);
-    const c = (t - 0.55) / 0.45;
-    const y = topY(x) - 0.26 * c * c * (c < 0 ? 0.8 : 1) + lift;
-    return target.set(x * side, y, lerp(zBack(x), zFront(x), t));
+    let y, nz;
+    if (t < TC) {
+      const c = 1 - t / TC;
+      y = topY(x) - 0.42 * c * c;
+      nz = -0.6 * c;
+    } else {
+      const c = (t - TC) / (1 - TC);
+      y = topY(x) - 0.14 * c * c;
+      nz = 0.8 * c;
+    }
+    return target.set(x * side, y + lift, lerp(zBack(x), zFront(x), t) + lift * nz);
   };
-  const trapOut = (p) => V(p.x * 0.25, 1, p.z * 0.6).normalize();
+  const trapOut = (p) => V(p.x * 0.15, 1, (p.z + 0.2) * 1.2).normalize();
 
   const lifts = [];
   const addLift = (obj, dir, amp, kind) => lifts.push({ obj, base: obj.position.clone(), dir: dir.clone().normalize(), amp, kind });
@@ -269,11 +278,9 @@ export function build(ctx) {
     const keep = (s, t) => {
       const [u, y] = map(s, t);
       torso.surface(u, y, P);
-      // open in front of the neck above the clavicles (neck + recess live there)
       return !(Math.abs(u) < 1.0 && y > clavY(P.x) - 0.04);
     };
     root.add(ctx.mesh(sheet(THREE, F, 128, 40, radial, keep), coreMat, 'collar.core'));
-    // flat cap closing the bottom cut
     const sec = torso.section(Y_BOT - 0.03);
     const shape = new THREE.Shape();
     for (let i = 0; i <= 64; i++) {
@@ -294,73 +301,67 @@ export function build(ctx) {
   for (const side of [1, -1]) {
     const key = side > 0 ? 'L' : 'R';
     const shrugDir = V(0.2 * side, 1, -0.05);
-    // overlapping lames, the inner (neck-side) ones lie on top, like shingles
+    // dark under-body of the trapezius (shows in the seams between lames)
+    {
+      const F = (s, t, target) => trapPoint(side, side > 0 ? s : 1 - s, t, target, -0.04);
+      root.add(ctx.mesh(sheet(THREE, F, 30, 16, trapOut), deepMat, `collar.trapezius.${key}.under`));
+    }
+    // long layered lames running the length of the slope; the front lame
+    // lies on top, like shingles overlapping toward the back
     const lames = [
-      { s0: 0.62, s1: 0.9, off: 0.02, mat: trapMat },
-      { s0: 0.3, s1: 0.68, off: 0.045, mat: trapMat },
-      { s0: 0.0, s1: 0.36, off: 0.07, mat: trapMat },
+      { t0: 0.0, t1: 0.42, off: 0.0, mat: trapAlt },
+      { t0: 0.37, t1: 0.74, off: 0.03, mat: trapMat },
+      { t0: 0.69, t1: 1.0, off: 0.06, mat: trapMat },
     ];
     lames.forEach((l, i) => {
-      const F = (s, t, target) => trapPoint(side, lerp(l.s0, l.s1, side > 0 ? s : 1 - s), lerp(0.0, 0.97, t), target, l.off);
-      const m = ctx.mesh(patch(THREE, geo, F, trapOut, { thickness: 0.07, bevel: 0.024, segU: 18, segV: 14 }), l.mat, `collar.trapezius.${key}.${i}`);
+      const F = (s, t, target) => trapPoint(side, side > 0 ? s : 1 - s, lerp(l.t0, l.t1, t), target, l.off);
+      const m = ctx.mesh(patch(THREE, geo, F, trapOut, { thickness: 0.07, bevel: 0.026, gap: 0.016, segU: 30, segV: 10 }), l.mat, `collar.trapezius.${key}.${i}`);
       root.add(m);
-      addLift(m, shrugDir, 0.03 + 0.015 * (2 - i), 'shrug');
+      addLift(m, shrugDir, 0.03 + 0.012 * i, 'shrug');
     });
-    // raised ridges running down the slope (film: bright stacked bands)
-    for (let k = 0; k < 3; k++) {
-      const t = 0.32 + k * 0.2;
-      const pts = [];
-      for (let j = 0; j <= 12; j++) {
-        const s = lerp(0.04, 0.95, j / 12);
-        const lameOff = s < 0.33 ? 0.07 : s < 0.65 ? 0.045 : 0.02;
-        pts.push(trapPoint(side, s, t, new THREE.Vector3(), lameOff + 0.005));
-      }
-      const g = geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(0.028, 0.012, 3, 12), {
-        steps: 40, up: (tt) => trapOut(pts[Math.round(tt * 12)]),
-      });
-      const m = ctx.mesh(g, mechMat, `collar.trapezius.${key}.rib.${k}`);
-      root.add(m);
-      addLift(m, shrugDir, 0.04, 'shrug');
-    }
-    // thick rolled front edge
+    // thick rolled bright front edge (the sloped diagonal line in front view)
     {
       const pts = [];
-      for (let j = 0; j <= 14; j++) {
-        const s = lerp(0.06, 0.98, j / 14);
-        const p = trapPoint(side, s, 0.97, new THREE.Vector3(), 0.03);
-        p.y -= 0.03;
+      for (let j = 0; j <= 16; j++) {
+        const s = lerp(0.12, 0.97, j / 16);
+        const p = trapPoint(side, s, 1.0, new THREE.Vector3(), 0.04);
+        p.y -= 0.035;
         pts.push(p);
       }
-      const g = geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(0.075, 0.04, 4, 24), {
-        steps: 60, up: V(0, 0.4, 1).normalize(),
-        scale: (t) => [0.75 + 0.35 * Math.sin(Math.PI * t), 1],
+      const g = geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(0.06, 0.042, 4, 24), {
+        steps: 60, up: V(0, 0.5, 1).normalize(),
+        scale: (t) => [0.85 + 0.25 * Math.sin(Math.PI * t), 1],
       });
-      const m = ctx.mesh(g, trapMat, `collar.trapezius.${key}.band`);
+      const m = ctx.mesh(g, bright, `collar.trapezius.${key}.band`);
       root.add(m);
-      addLift(m, shrugDir, 0.04, 'shrug');
+      addLift(m, shrugDir, 0.05, 'shrug');
     }
 
     // ---------------------------------------------------- shoulder armour
     const pivot = new THREE.Group();
     pivot.name = `collar.shoulderPivot.${key}`;
-    const C = V(1.5 * side, 0.42, -0.12);
+    const C = V(1.62 * side, 0.42, -0.1);
     pivot.position.copy(C);
     root.add(pivot);
     shoulderPivots[key] = pivot;
-    const R = [0.44, 0.44, 0.56];
+    const R = [0.5, 0.54, 0.62];
+    const coreG = new THREE.SphereGeometry(1, 40, 20);
+    coreG.scale(R[0] * 0.98, R[1] * 0.98, R[2] * 0.98);
+    pivot.add(ctx.mesh(coreG, deepMat, `collar.shoulder.${key}.core`));
     const shells = [
-      { th0: 0.0, th1: 0.75, off: 0.06, mat: trapMat },
-      { th0: 0.68, th1: 1.3, off: 0.035, mat: pecAlt },
-      { th0: 1.22, th1: 1.85, off: 0.01, mat: pecMat },
+      { th0: 0.0, th1: 0.66, off: 0.09, mat: trapMat },
+      { th0: 0.58, th1: 1.12, off: 0.06, mat: pecAlt },
+      { th0: 1.04, th1: 1.6, off: 0.035, mat: trapAlt },
+      { th0: 1.52, th1: 2.1, off: 0.01, mat: lowMat },
     ];
     shells.forEach((sh, i) => {
       const F = (s, t, target) => {
-        const ph = lerp(-0.35, 3.3, side > 0 ? s : 1 - s); // 0 = front, PI/2 = outward, PI = back
+        const ph = lerp(-0.7, 3.4, side > 0 ? s : 1 - s); // 0 = front, PI/2 = outward, PI = back
         const th = lerp(sh.th0, sh.th1, t) + 1e-3;
         return target.set(R[0] * Math.sin(th) * Math.sin(ph) * side, R[1] * Math.cos(th), R[2] * Math.sin(th) * Math.cos(ph));
       };
       const out = (p) => p.clone();
-      const g = patch(THREE, geo, F, out, { offset: sh.off, thickness: 0.07, bevel: 0.024, segU: 30, segV: 10 });
+      const g = patch(THREE, geo, F, out, { offset: sh.off, thickness: 0.07, bevel: 0.026, gap: 0.018, segU: 36, segV: 10 });
       pivot.add(ctx.mesh(g, sh.mat, `collar.shoulder.${key}.${i}`));
     });
   }
@@ -371,72 +372,61 @@ export function build(ctx) {
     const key = side > 0 ? 'L' : 'R';
     const pts = [];
     for (let k = 0; k <= 12; k++) {
-      const x = lerp(0.14, 1.5, k / 12);
+      const x = lerp(0.78, 1.5, k / 12);
       const y = clavY(x);
       pts.push(V(x * side, y, frontZ(x, y) + 0.04 - 0.08 * smooth(1.2, 1.5, x)));
     }
     const curve = new THREE.CatmullRomCurve3(pts);
     clavCurve[key] = curve;
-    const bar = geo.sweptSection(curve, geo.roundedSection(0.09, 0.032, 6, 28), {
-      steps: 60, up: V(0, 1, 0.4).normalize(),
-      scale: (t) => [0.8 + 0.3 * Math.sin(Math.PI * t), 1 - 0.2 * t],
+    const bar = geo.sweptSection(curve, geo.roundedSection(0.08, 0.034, 5, 28), {
+      steps: 50, up: V(0, 1, 0.4).normalize(),
+      scale: (t) => [0.85 + 0.25 * Math.sin(Math.PI * t), 1 - 0.2 * t],
     });
-    const m = ctx.mesh(bar, pecMat, `collar.clavicle.${key}`);
+    const m = ctx.mesh(bar, pecAlt, `collar.clavicle.${key}`);
     root.add(m);
     addLift(m, V(0, 0.3, 1), 0.02, 'breathe');
   }
 
-  // ------------------------------------------- recess + actuators
-  const actuators = [];
+  // ------------------------------------------- supraclavicular recess
+  // deep dark cave between the trapezius front edge and the clavicle,
+  // with fine horizontal ribs (film / front ref)
   for (const side of [1, -1]) {
     const key = side > 0 ? 'L' : 'R';
     const A = new THREE.Vector3(), B = new THREE.Vector3();
-    // loft from the trapezius front edge (top) to the clavicle (bottom), dipping back
     const floor = (s, t, target) => {
-      const x = lerp(0.5, 1.45, s);
-      trapPoint(side, (x - TX0) / (TX1 - TX0), 0.95, A, -0.02);
-      clavCurve[key].getPointAt(clamp01((x - 0.14) / 1.36), B);
-      B.z -= 0.05;
+      const x = lerp(0.62, 1.5, s);
+      trapPoint(side, (x - TX0) / (TX1 - TX0), 1.0, A, 0.0);
+      A.y -= 0.06;
+      clavCurve[key].getPointAt(clamp01((x - 0.78) / 0.72), B);
+      B.z -= 0.06;
       target.lerpVectors(A, B, t);
-      target.z -= 0.18 * Math.sin(Math.PI * t) * Math.pow(Math.sin(Math.PI * clamp01(s * 1.1)), 0.4);
+      target.z -= 0.24 * Math.sin(Math.PI * t) * Math.pow(Math.sin(Math.PI * clamp01(s * 1.05)), 0.4);
       return target;
     };
     root.add(ctx.mesh(sheet(THREE, floor, 28, 14, () => V(0, 0.4, 1)), deepMat, `collar.recess.${key}`));
-    // horizontal ribs across the floor
-    for (let k = 0; k < 4; k++) {
-      const t = 0.2 + k * 0.2;
-      const pts = [];
-      for (let j = 0; j <= 10; j++) pts.push(floor(lerp(0.02, 0.98, j / 10), t, new THREE.Vector3()).add(V(0, 0, 0.02)));
-      root.add(ctx.mesh(geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(0.018, 0.022, 3, 10), { steps: 24 }), mechMat, `collar.recess.${key}.rib.${k}`));
-    }
-    // two big ribbed actuators lying along the trough
-    [0.38, 0.68].forEach((t, i) => {
-      const a = floor(0.0, t, new THREE.Vector3()).add(V(0, 0, 0.05));
-      const b = floor(1.0, t, new THREE.Vector3()).add(V(0, 0, 0.03));
-      const dir = b.clone().sub(a);
-      const len = dir.length();
-      dir.normalize();
-      const g = new THREE.Group();
-      g.name = `collar.actuator.${key}.${i}`;
-      g.position.copy(a);
-      g.quaternion.setFromUnitVectors(V(0, 1, 0), dir);
-      root.add(g);
-      const r = 0.055 - i * 0.008;
-      const bl = len * 0.6;
-      const prof = [[0, -0.01, 0], [1, -0.012, 0], [1, 0, 0.012]];
-      for (let k = 1; k <= 5; k++) {
-        const yb = bl * (0.1 + (0.85 * k) / 6);
-        prof.push([1, 0, yb - 0.018], [1, 0.008, yb - 0.01], [1, 0.008, yb + 0.01], [1, 0, yb + 0.018]);
-      }
-      prof.push([1, 0, bl - 0.012], [1, -0.012, bl], [0, -0.012, bl]);
-      const bm = ctx.mesh(puck(THREE, geo, seLoop(r, r, 2, 24), prof, 0, 0, 50), deepMat, `collar.actuator.${key}.${i}.barrel`);
-      g.add(bm);
-      g.add(ctx.mesh(puck(THREE, geo, seLoop(r * 1.25, r * 1.25, 2, 24), segProfile(-0.05, 0.05, 0.014), 0, 0), mechMat, `collar.actuator.${key}.${i}.mount`));
-      g.add(ctx.mesh(puck(THREE, geo, seLoop(r * 0.45, r * 0.45, 2, 16), segProfile(len * 0.4, len, 0.008), 0, 0), bright, `collar.actuator.${key}.${i}.rod`));
-      g.add(ctx.mesh(puck(THREE, geo, seLoop(r * 1.1, r * 1.1, 2, 24), segProfile(len - 0.07, len + 0.04, 0.014), 0, 0), mechMat, `collar.actuator.${key}.${i}.end`));
-      const glm = ctx.mesh(puck(THREE, geo, seLoop(r * 1.1, r * 1.1, 2, 24), segProfile(-0.03, 0, 0.008), 0, 0), bright, `collar.actuator.${key}.${i}.gland`);
-      g.add(glm);
-      actuators.push({ barrel: bm, gland: glm, bl });
+    // stepped front lames over the recess: broad bands following the slope,
+    // each upper band overlapping the one below it (dark gaps between)
+    const face = (s, t, target) => {
+      const x = lerp(0.66, 1.5, s);
+      trapPoint(side, (x - TX0) / (TX1 - TX0), 1.0, A, 0.0);
+      A.y -= 0.07;
+      clavCurve[key].getPointAt(clamp01((x - 0.78) / 0.72), B);
+      B.z -= 0.02;
+      B.y += 0.03;
+      target.lerpVectors(A, B, t);
+      target.z -= 0.16 * Math.sin(Math.PI * t) * Math.pow(Math.sin(Math.PI * clamp01(s * 1.05)), 0.4);
+      return target;
+    };
+    const bands = [
+      { t0: 0.0, t1: 0.4, off: 0.06, mat: trapAlt },
+      { t0: 0.36, t1: 0.72, off: 0.04, mat: pecMat },
+      { t0: 0.68, t1: 1.0, off: 0.02, mat: lowMat },
+    ];
+    bands.forEach((b, i) => {
+      const F = (s, t, target) => face(side > 0 ? s : 1 - s, lerp(b.t1, b.t0, t), target);
+      const m = ctx.mesh(patch(THREE, geo, F, () => V(0, 0.35, 1), { offset: b.off, thickness: 0.06, bevel: 0.022, gap: 0.03, segU: 24, segV: 6 }), b.mat, `collar.recess.${key}.lame.${i}`);
+      root.add(m);
+      addLift(m, V(0.1 * side, 0.6, 0.6), 0.015 * (3 - i), 'breathe');
     });
   }
 
@@ -447,31 +437,28 @@ export function build(ctx) {
   };
   for (const side of [1, -1]) {
     const key = side > 0 ? 'L' : 'R';
-    // pec lames: chevrons following the clavicle, upper lames overlap lower
+    // few, large pectoral plates; the lower chest goes darker (frame fade)
     const pecs = [
-      { x0: 0.13, x1: 0.7, a: 0.06, b: 0.32, off: 0.05, mat: pecAlt },
-      { x0: 0.7, x1: 1.32, a: 0.06, b: 0.32, off: 0.05, mat: pecMat },
-      { x0: 0.13, x1: 0.55, a: 0.28, b: 0.6, off: 0.03, mat: pecMat },
-      { x0: 0.55, x1: 1.0, a: 0.28, b: 0.6, off: 0.03, mat: pecAlt },
-      { x0: 1.0, x1: 1.36, a: 0.28, b: 0.6, off: 0.03, mat: pecMat },
-      { x0: 0.13, x1: 0.8, a: 0.56, b: null, off: 0.012, mat: pecAlt },
-      { x0: 0.8, x1: 1.38, a: 0.56, b: null, off: 0.012, mat: pecMat },
+      { x0: 0.15, x1: 1.0, a: 0.04, lo: -0.2, off: 0.075, th: 0.09, mat: pecAlt },
+      { x0: 0.96, x1: 1.5, a: 0.08, lo: -0.12, off: 0.045, th: 0.07, mat: pecMat },
+      { x0: 0.15, x1: 0.9, a: null, hi: -0.17, lo: Y_BOT, off: 0.05, th: 0.07, mat: lowMat },
+      { x0: 0.86, x1: 1.5, a: null, hi: -0.09, lo: Y_BOT, off: 0.025, th: 0.06, mat: lowMat },
     ];
     pecs.forEach((pc, i) => {
       const fn = (s, t) => {
         const x = lerp(pc.x0, pc.x1, side > 0 ? s : 1 - s) * side;
-        const c = clavY(x);
-        const hi = c - pc.a;
-        const lo = pc.b === null ? Y_BOT : Math.max(Y_BOT, c - pc.b);
+        const ax = Math.abs(x);
+        // lower edge sweeps up toward the armpit (big curved pec shape)
+        const lo = pc.a === null ? pc.lo : pc.lo + 0.12 * smooth(0.5, 1.3, ax);
+        const hi = pc.a === null ? pc.hi + 0.12 * smooth(0.5, 1.3, ax) : clavY(x) - pc.a;
         const y = lerp(lo, hi, t);
         return [uAtX(x, y), y];
       };
-      const m = ctx.mesh(patch(THREE, geo, onTorso(fn), radial, { offset: pc.off, segU: 18, segV: 10 }), pc.mat, `collar.pec.${key}.${i}`);
+      const m = ctx.mesh(patch(THREE, geo, onTorso(fn), radial, { offset: pc.off, thickness: pc.th, bevel: 0.028, gap: 0.02, segU: 22, segV: 12 }), pc.mat, `collar.pec.${key}.${i}`);
       root.add(m);
       const [u, y] = fn(0.5, 0.5);
       addLift(m, torso.normal(u, y, new THREE.Vector3()), 0.02, 'breathe');
     });
-    // upper back plates: from under the trapezius back edge down to the cut
     const backs = [
       { u0: 1.25, u1: 2.2, y0: Y_BOT, y1: 0.45, off: 0.03, mat: pecMat },
       { u0: 2.1, u1: Math.PI - 0.03, y0: Y_BOT, y1: 0.62, off: 0.03, mat: trapAlt },
@@ -487,25 +474,24 @@ export function build(ctx) {
   {
     const fn = (s, t) => {
       const x = lerp(-0.13, 0.13, s);
-      const top = clavY(0) - 0.02 + 0.8 * Math.abs(x);
+      const top = clavY(0) - 0.02 + 0.6 * Math.abs(x);
       const y = lerp(Y_BOT, top, t);
       return [uAtX(x, y), y];
     };
-    const m = ctx.mesh(patch(THREE, geo, onTorso(fn), radial, { offset: 0.07, thickness: 0.08, segU: 10, segV: 18 }), pecAlt, 'collar.sternum');
+    const m = ctx.mesh(patch(THREE, geo, onTorso(fn), radial, { offset: 0.085, thickness: 0.08, segU: 10, segV: 18 }), pecMat, 'collar.sternum');
     root.add(m);
     addLift(m, V(0, 0, 1), 0.02, 'breathe');
-    // bright centre line + the notch ring at the top
     const pts = [];
     for (let k = 0; k <= 8; k++) {
       const y = lerp(Y_BOT + 0.02, clavY(0) - 0.06, k / 8);
-      pts.push(V(0, y, frontZ(0, y) + 0.085));
+      pts.push(V(0, y, frontZ(0, y) + 0.1));
     }
-    const line = ctx.mesh(geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(0.016, 0.012, 3, 10), { steps: 20 }), bright, 'collar.notch.line');
+    const line = ctx.mesh(geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(0.014, 0.012, 3, 10), { steps: 20 }), bright, 'collar.notch.line');
     root.add(line);
     addLift(line, V(0, 0, 1), 0.02, 'breathe');
     const ny = clavY(0) + 0.02;
     const notch = puck(THREE, geo, seLoop(0.2, 0.1, 2.6, 32), segProfile(ny - 0.07, ny, 0.02), 0, frontZ(0, ny) - 0.08);
-    root.add(ctx.mesh(notch, bright, 'collar.notch'));
+    root.add(ctx.mesh(notch, pecMat, 'collar.notch'));
   }
 
   // --------------------------------------------------------------- params
@@ -515,7 +501,7 @@ export function build(ctx) {
     else seen.set(l.obj, l.base);
   }
   const pivotBase = Object.fromEntries(Object.entries(shoulderPivots).map(([k, p]) => [k, p.position.clone()]));
-  const params = { breathe: 0, shrug: 0, actuate: 0.3, idle: 1 };
+  const params = { breathe: 0, shrug: 0, idle: 1 };
   const pose = (p, breath) => {
     const b = p.breathe + breath;
     for (const l of lifts) l.obj.position.copy(l.base);
@@ -525,12 +511,6 @@ export function build(ctx) {
       pv.position.copy(pivotBase[k]).add(V(0.02 * side * p.shrug, 0.05 * p.shrug, 0));
       pv.rotation.z = -side * 0.08 * p.shrug;
     }
-    const a = clamp01(p.actuate);
-    for (const ac of actuators) {
-      const s = 0.85 + 0.25 * a;
-      ac.barrel.scale.set(1, s, 1);
-      ac.gland.position.y = ac.bl * s;
-    }
   };
 
   return {
@@ -538,7 +518,6 @@ export function build(ctx) {
     paramSpec: {
       breathe: { min: 0, max: 1, step: 0.01 },
       shrug: { min: -1, max: 1, step: 0.01 },
-      actuate: { min: 0, max: 1, step: 0.01 },
       idle: { min: 0, max: 1, step: 0.01 },
     },
     apply(p) {
