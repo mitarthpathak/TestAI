@@ -1,24 +1,28 @@
 /**
- * PART: fins — the two long curved horn blades on the sides of the head.
- * Each blade roots in a ball socket on the upper side of the skull (joint
- * finL / finR), bows outward and down around the cheek disc and ends in a
- * sharp point pointing forward-inward near jaw level. Near the root the blade
- * forks: a thinner inner prong runs parallel to the main blade and ends in its
- * own spike above the root.
+ * PART: fins — the two stand-off horn blades that frame the face like ( ).
  *
- * Authoring: LEFT blade in HEAD space -> converted to the joint's local space
- * (origin = joint). The right blade is the X-mirror.
+ * Each blade follows LANDMARKS.finCurveL (mirrored for the right): rooted in a
+ * bracket on the upper cranium side (joint finL / finR), a short free spike
+ * rises above the bracket, the blade bows out around the cheek turbine
+ * (outer edge x ~1.08 at y ~0.72) and ends in a forward tusk that curls in
+ * toward the mouth corner. A thinner inner blade runs parallel inside the
+ * upper half (concept art "double blade") and merges into the main blade.
  *
- * Meshes (per side K = L | R):
- *   fins.socket.K   static collar on the skull (does not move)
- *   fins.pivot.K    Group at the joint: flare / sweep rotate everything below
- *     fins.knuckle.K  ball in the socket
- *     fins.arm.K      bracket from the ball to the blade
- *     fins.blade.K    main blade (broad flat face, bevels, centre ridge)
- *     fins.edge.K     bright bevel strip along the outer edge of the face
- *     fins.prongPivot.K -> fins.prong.K   inner prong (split opens the fork)
+ * Authoring: LEFT side in HEAD space, converted to the joint's local space
+ * (origin = joint) so the pivot sits at the root. Right side = X mirror.
  *
- * Params: flare (outward swing), sweep (fore/aft swing), split (fork opening).
+ * Meshes (K = L | R):
+ *   fins.socket.K           static socket on the skull (collar + bolts)
+ *   fins.pivot.K            Group at the joint; flare / sweep rotate it
+ *     fins.knuckle.K        ball in the socket
+ *     fins.bracket.K        arm from the ball to the blade
+ *     fins.blade.K          main lens-section blade with bevels
+ *     fins.ridge.K          raised centre spine on the blade face
+ *     fins.edge.K           polished outer bevel strip
+ *     fins.innerPivot.K -> fins.inner.K   thinner inner blade (split opens it)
+ *
+ * Params: flare (outward swing, rad), sweep (fore/aft swing, rad),
+ * split (inner blade opens), idle (amplitude of a slow breathing flare).
  */
 export const meta = {
   id: 'fins',
@@ -26,197 +30,169 @@ export const meta = {
 };
 
 export function build(ctx) {
-  const { THREE, geo, anatomy, rig, materials: M } = ctx;
+  const { THREE, geo, anatomy, materials: M } = ctx;
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
   const S = THREE.MathUtils.smoothstep;
+  const deg = THREE.MathUtils.degToRad;
 
-  const bladeMat = M.get('chrome', { roughness: 0.2, color: 0x9a9ea4, panel: 2.2, seed: 51, lineWidth: 0.0026, angle: 0.0 });
-  const prongMat = M.get('chrome', { roughness: 0.2, color: 0x80848a });
-  const edgeMat = M.get('chrome', { roughness: 0.1, color: 0xb4b8be });
-  const armMat = M.get('gunmetal', { roughness: 0.3, panel: 9, seed: 57, lineWidth: 0.004 });
-  const knuckleMat = M.get('chrome', { roughness: 0.22, color: 0x74787e });
+  const bladeMat = M.get('chrome', { roughness: 0.17, color: 0xadb3ba, panel: 3.2, seed: 61, lineWidth: 0.0028 });
+  const innerMat = M.get('gunmetal', { roughness: 0.24, color: 0x858c94, panel: 4, seed: 63, lineWidth: 0.003 });
+  const ridgeMat = M.get('chrome', { roughness: 0.14, color: 0xb0b6bc });
+  const edgeMat = M.get('chrome', { roughness: 0.08, color: 0xc4c9ce });
+  const bracketMat = M.get('chrome', { roughness: 0.22, color: 0x80878f });
+  const knuckleMat = M.get('chrome', { roughness: 0.2, color: 0x7d838a });
   const socketMat = M.get('gunmetal', { roughness: 0.32 });
   const darkMat = M.get('darkMetal');
 
-  // ------------------------------------------------------------ LEFT blade, HEAD space
   const J = V(...anatomy.JOINTS.finL.pos);
   const toLocal = (p) => p.clone().sub(J);
+  const FC = anatomy.LANDMARKS.finCurveL.map((p) => V(...p));
 
-  // main blade centre line: top spike -> temple root -> down the back of the
-  // cheek disc -> wraps under it -> hooks forward/inward to a tusk point at
-  // about mouth level. The lower half is authored in the cheek-disc frame so
-  // it hugs the disc band (front spread ~1.3x head half-width).
-  const DC = V(...anatomy.LANDMARKS.cheekDiscL);
-  const DN = V(...anatomy.LANDMARKS.cheekDiscNormalL).normalize();
-  const DX = V(0, 1, 0).cross(DN).normalize(); // back / ear side
-  const DY = V(0, 0, 0).crossVectors(DN, DX).normalize(); // ~up
-  const RK = anatomy.LANDMARKS.cheekDiscRadius / 0.27;
-  const disc = (deg, r, h) => {
-    const a = THREE.MathUtils.degToRad(deg);
-    return DC.clone().addScaledVector(DX, r * RK * Math.cos(a)).addScaledVector(DY, r * RK * Math.sin(a)).addScaledVector(DN, h);
-  };
+  // ------------------------------------------------------------ centre line
+  // free spike above the bracket -> landmark curve -> tusk tip curling inward
+  // film / ILM concept: the free top spike sits only ~0.3 above the eyes,
+  // just outside the cheek bands; the root reaches the cranium via the
+  // inner connector blade (see below).
   const mainPts = [
-    V(0.62, 1.74, -0.14),
-    V(0.79, 1.58, -0.02),
-    V(0.89, 1.36, 0.07),
-    V(0.93, 1.13, 0.11),
-    disc(52, 0.6, 0.0),
-    disc(18, 0.56, 0.02),
-    disc(-24, 0.52, 0.05),
-    disc(-58, 0.46, 0.09),
-    disc(-86, 0.42, 0.13),
-    disc(-104, 0.39, 0.17),
-    disc(-120, 0.37, 0.21),
-    disc(-133, 0.36, 0.24),
+    V(0.8, 1.47, -0.08),
+    V(0.88, 1.33, 0.0),
+    V(0.94, 1.19, 0.06),
+    V(0.99, 1.02, 0.13),
+    V(1.03, 0.76, 0.2),
+    V(0.98, 0.48, 0.3),
+    FC[5].clone(),
+    V(0.73, 0.195, 0.53),
+    V(0.6, 0.165, 0.62),
   ].map(toLocal);
   const mainCurve = new THREE.CatmullRomCurve3(mainPts, false, 'centripetal');
 
-  // blade face normal ("up" of the section) — faces forward / outward
-  const headAxisLocal = toLocal(V(0, 0, 0.08));
-  const faceUp = (curve, bias = 0) => (t) => {
+  // the head axis (for "outward") at the blade's height
+  const axisAt = (p) => {
+    const y = p.y + J.y;
+    const s = anatomy.headSection(y);
+    return V(-J.x, p.y, s.zc - J.z);
+  };
+  /** blade face normal: outward from the head, turned forward */
+  const faceUp = (curve, fwdK = 0.55) => (t) => {
     const p = curve.getPointAt(t);
-    const out = V(p.x - headAxisLocal.x, 0, p.z - headAxisLocal.z).normalize();
-    const fwd = V(0.12, 0.28 - 0.3 * t, 0.95).normalize();
-    const base = fwd.multiplyScalar(0.78).addScaledVector(out, 0.5 + bias).normalize();
-    // lower half: broad face turns to the cheek-disc normal (faces out/forward)
-    return base.lerp(DN, 0.75 * S(t, 0.3, 0.6)).normalize();
+    const a = axisAt(p);
+    const out = V(p.x - a.x, 0, p.z - a.z).normalize();
+    const fwd = V(0, 0, 1);
+    return out.multiplyScalar(1).addScaledVector(fwd, fwdK).normalize();
   };
 
-  const lerpKeys = (keys) => (t) => {
-    for (let i = 1; i < keys.length; i++) {
-      if (t <= keys[i][0]) {
-        const [t0, v0] = keys[i - 1];
-        const [t1, v1] = keys[i];
+  const keys = (k) => (t) => {
+    for (let i = 1; i < k.length; i++) {
+      if (t <= k[i][0]) {
+        const [t0, v0] = k[i - 1];
+        const [t1, v1] = k[i];
         return v0 + (v1 - v0) * S(t, t0, t1);
       }
     }
-    return keys[keys.length - 1][1];
+    return k[k.length - 1][1];
   };
-  // half width across the face and half thickness
-  const mainW = lerpKeys([[0, 0.004], [0.05, 0.036], [0.15, 0.062], [0.4, 0.072], [0.66, 0.068], [0.84, 0.05], [0.95, 0.026], [1, 0.003]]);
-  const mainH = lerpKeys([[0, 0.008], [0.1, 0.03], [0.55, 0.036], [0.8, 0.034], [0.94, 0.02], [1, 0.005]]);
+  // half width across the face / half thickness
+  const mainW = keys([[0, 0.004], [0.06, 0.032], [0.14, 0.054], [0.35, 0.064], [0.62, 0.062], [0.82, 0.047], [0.94, 0.024], [1, 0.002]]);
+  const mainH = keys([[0, 0.006], [0.08, 0.02], [0.3, 0.025], [0.7, 0.024], [0.9, 0.016], [1, 0.003]]);
 
-  /**
-   * Faceted blade section: flat back, chamfered edges, flat face with a low
-   * centre ridge (crisp with a small crease angle). CCW, x = across, y = face.
-   */
-  const bladeSection = (Wf, Hf, ridge = 0.35) => (t) => {
+  /** Lens / blade section with chamfered bevels (CCW, x across, y face). */
+  const lens = (Wf, Hf) => (t) => {
     const W = Wf(t), H = Hf(t);
-    const b = Math.min(0.022, W * 0.42);
+    const b = Math.min(0.018, W * 0.35);
     return [
-      [W, -0.1 * H],
-      [W - 0.25 * b, 0.55 * H],
-      [W - b, H],
-      [0.12 * W, H * (1 + ridge)],
-      [-0.1 * W, H * (1 + ridge)],
-      [-W + b, H],
-      [-W + 0.25 * b, 0.55 * H],
-      [-W, -0.1 * H],
-      [-W + 0.6 * b, -H],
-      [W - 0.6 * b, -H],
+      [W, 0], [W - 0.35 * b, 0.45 * H], [W - b, 0.85 * H], [W - 2.2 * b, H],
+      [-W + 2.2 * b, H], [-W + b, 0.85 * H], [-W + 0.35 * b, 0.45 * H], [-W, 0],
+      [-W + 0.35 * b, -0.45 * H], [-W + b, -0.85 * H], [-W + 2.2 * b, -H],
+      [W - 2.2 * b, -H], [W - b, -0.85 * H], [W - 0.35 * b, -0.45 * H],
     ];
   };
-
-  const bladeGeo = geo.sweptSection(mainCurve, bladeSection(mainW, mainH), {
-    steps: 140, up: faceUp(mainCurve), creaseAngle: THREE.MathUtils.degToRad(22),
-  });
-
-  // inner prong: runs along the inner edge of the upper blade with a narrow
-  // slot, rises into its own spike above the main tip, merges lower down.
-  const inward = (t) => {
-    const p = mainCurve.getPointAt(t);
-    return V(headAxisLocal.x - p.x, 0, headAxisLocal.z - p.z).normalize();
-  };
   const mainUp = faceUp(mainCurve);
-  /** unit "across" vector of the main blade at t, pointing toward the skull */
-  const acrossIn = (t) => {
-    const T = mainCurve.getTangentAt(t);
-    const B = V(0, 0, 0).crossVectors(T, mainUp(t)).normalize();
-    return B.dot(inward(t)) < 0 ? B.negate() : B;
+  const bladeGeo = geo.sweptSection(mainCurve, lens(mainW, mainH), {
+    steps: 150, up: mainUp, creaseAngle: deg(24),
+  });
+
+  /** frame of the main blade at t: { P, T, B (across), Nf (face) } */
+  const frameAt = (curve, upFn, t) => {
+    const P = curve.getPointAt(t);
+    const T = curve.getTangentAt(t).normalize();
+    const B = V(0, 0, 0).crossVectors(T, upFn(t)).normalize();
+    const Nf = V(0, 0, 0).crossVectors(B, T).normalize();
+    return { P, T, B, Nf };
   };
-  const prongW = lerpKeys([[0, 0.003], [0.07, 0.016], [0.25, 0.024], [0.8, 0.026], [1, 0.026]]);
-  const prongH = lerpKeys([[0, 0.005], [0.12, 0.013], [1, 0.015]]);
-  const prongPts = [];
-  const PR = 12, P_T0 = 0.0, P_T1 = 0.4;
-  for (let i = 0; i <= PR; i++) {
-    const s = i / PR;
-    const t = P_T0 + s * (P_T1 - P_T0);
-    const p = mainCurve.getPointAt(Math.max(t, 0.012));
-    const gap = THREE.MathUtils.lerp(0.032, -0.03, S(s, 0.55, 1.0)) + 0.05 * Math.pow(1 - s, 3);
-    const d = mainW(Math.max(t, 0.05)) + prongW(s) + gap;
-    const rise = Math.pow(1 - s, 2) * 0.07; // spike rises above the main tip
-    prongPts.push(p.clone()
-      .addScaledVector(acrossIn(Math.max(t, 0.012)), d)
-      .addScaledVector(mainUp(t), -0.012 * S(s, 0.4, 1.0))
-      .add(V(0, rise, -0.03 * (1 - s))));
-  }
-  const prongCurve = new THREE.CatmullRomCurve3(prongPts, false, 'centripetal');
-  const prongGeo = geo.sweptSection(prongCurve, bladeSection(prongW, prongH, 0.25), {
-    steps: 60, up: faceUp(prongCurve, 0.15), creaseAngle: THREE.MathUtils.degToRad(22),
-  });
-  const prongRoot = prongCurve.getPointAt(1);
+  const inwardSign = (t) => {
+    const f = frameAt(mainCurve, mainUp, t);
+    const a = axisAt(f.P);
+    const toAxis = V(a.x - f.P.x, 0, a.z - f.P.z);
+    return f.B.dot(toAxis) > 0 ? 1 : -1;
+  };
 
-  // bright edge strip along the outer edge of the face (reads as bevel highlight)
-  const edgeUp = faceUp(mainCurve);
-  const edgePts = [];
-  for (let i = 0; i <= 40; i++) {
-    const t = 0.06 + (i / 40) * 0.86;
-    const p = mainCurve.getPointAt(t);
-    const T = mainCurve.getTangentAt(t);
-    const up = edgeUp(t);
-    const B = V(0, 0, 0).crossVectors(T, up).normalize();
-    const Nn = V(0, 0, 0).crossVectors(B, T).normalize();
-    // outer edge = the side facing away from the head
-    const sgn = B.dot(inward(t)) > 0 ? -1 : 1;
-    edgePts.push(p.clone().addScaledVector(B, sgn * (mainW(t) - 0.006)).addScaledVector(Nn, mainH(t) * 0.8));
-  }
-  const edgeCurve = new THREE.CatmullRomCurve3(edgePts);
-  const edgeGeo = geo.sweptSection(edgeCurve, geo.roundedSection(0.0045, 0.0045, 2, 8), {
-    steps: 80, up: (t) => edgeUp(0.06 + t * 0.86), scale: (t) => 0.5 + 0.5 * Math.sin(Math.PI * t),
-  });
+  /** strip that rides on the blade at across-offset u (fraction of W) */
+  const rideStrip = (t0, t1, uFrac, lift, section, steps, scaleFn) => {
+    const pts = [];
+    const n = 40;
+    for (let i = 0; i <= n; i++) {
+      const t = t0 + ((t1 - t0) * i) / n;
+      const f = frameAt(mainCurve, mainUp, t);
+      const sgn = inwardSign(t);
+      pts.push(f.P.clone().addScaledVector(f.B, -sgn * uFrac * mainW(t)).addScaledVector(f.Nf, mainH(t) * lift));
+    }
+    const c = new THREE.CatmullRomCurve3(pts);
+    return geo.sweptSection(c, section, {
+      steps, up: (s) => mainUp(t0 + (t1 - t0) * s), scale: scaleFn, creaseAngle: deg(30),
+    });
+  };
+  // raised spine along the face (slightly toward the inner edge)
+  const ridgeGeo = rideStrip(0.1, 0.9, -0.12, 0.95, geo.roundedSection(0.011, 0.006, 3, 12), 90, (s) => [0.4 + 0.6 * Math.sin(Math.PI * s), 1]);
+  // polished outer bevel strip
+  const edgeGeo = rideStrip(0.06, 0.93, 0.8, 0.55, geo.roundedSection(0.005, 0.004, 2, 8), 90, (s) => 0.5 + 0.5 * Math.sin(Math.PI * s));
 
-  // root: skull point + normal under the joint
+  // ------------------------------------------------- root socket / knuckle
   const uJ = anatomy.headAngleForX(J.x, J.y);
   const skullP = anatomy.headSurface(uJ, J.y, V(0, 0, 0));
   const skullN = anatomy.headNormal(uJ, J.y, V(0, 0, 0));
   const skullLocal = toLocal(skullP);
+  const knuckleC = skullLocal.clone().addScaledVector(skullN, 0.035);
 
-  // bracket arm: from the ball to the blade (nearest blade point to the joint)
-  let tRoot = 0.15, best = Infinity;
-  for (let i = 0; i <= 60; i++) {
-    const t = 0.05 + (i / 60) * 0.35;
-    const d = mainCurve.getPointAt(t).length();
-    if (d < best) { best = d; tRoot = t; }
-  }
-  const bladeRootP = mainCurve.getPointAt(tRoot);
-  const armPts = [
-    V(0, 0, 0),
-    V(0, 0, 0).lerp(bladeRootP, 0.35).addScaledVector(skullN, 0.015).add(V(0, 0.012, 0)),
-    V(0, 0, 0).lerp(bladeRootP, 0.7).add(V(0, 0.012, 0)),
-    bladeRootP.clone().addScaledVector(inward(tRoot), -0.01),
-  ];
-  const armCurve = new THREE.CatmullRomCurve3(armPts);
-  const armGeo = geo.sweptSection(armCurve, (t) => {
-    const w = THREE.MathUtils.lerp(0.04, 0.066, S(t, 0.3, 1));
-    const h = THREE.MathUtils.lerp(0.03, 0.022, t);
+  // ------------------------------------------------------- inner blade
+  // connector from the root knuckle on the cranium side, standing off the
+  // skull, down and out to merge into the inner edge of the main blade.
+  const T_MERGE = 0.24;
+  const mf = frameAt(mainCurve, mainUp, T_MERGE);
+  const mergeP = mf.P.clone().addScaledVector(mf.B, inwardSign(T_MERGE) * mainW(T_MERGE) * 0.6);
+  const innerCurve = new THREE.CatmullRomCurve3([
+    knuckleC.clone(),
+    toLocal(V(0.78, 1.5, -0.06)),
+    toLocal(V(0.84, 1.36, -0.04)),
+    mergeP,
+  ], false, 'centripetal');
+  const innerW = keys([[0, 0.022], [0.15, 0.03], [0.6, 0.032], [0.9, 0.03], [1, 0.022]]);
+  const innerH = keys([[0, 0.016], [0.5, 0.017], [1, 0.014]]);
+  const innerGeo = geo.sweptSection(innerCurve, lens(innerW, innerH), {
+    steps: 60, up: faceUp(innerCurve, 0.35), creaseAngle: deg(24),
+  });
+  const innerRoot = knuckleC.clone();
+
+  // ------------------------------------------------- clamp bracket (merge)
+  const clampCurve = new THREE.CatmullRomCurve3([0.21, 0.23, 0.25, 0.27].map((t) => mainCurve.getPointAt(t)));
+  const armGeo = geo.sweptSection(clampCurve, (t) => {
+    const W = mainW(0.24) + 0.008, H = mainH(0.24) + 0.007;
     const b = 0.01;
-    return [[w, 0], [w - b * 0.4, h * 0.7], [w - b, h], [-w + b, h], [-w + b * 0.4, h * 0.7], [-w, 0], [-w + b * 0.4, -h * 0.7], [-w + b, -h], [w - b, -h], [w - b * 0.4, -h * 0.7]];
-  }, { steps: 24, up: faceUp(mainCurve)(tRoot), creaseAngle: THREE.MathUtils.degToRad(30) });
+    return [[W, 0], [W - b * 0.4, H * 0.7], [W - b, H], [-W + b, H], [-W + b * 0.4, H * 0.7], [-W, 0], [-W + b * 0.4, -H * 0.7], [-W + b, -H], [W - b, -H], [W - b * 0.4, -H * 0.7]];
+  }, { steps: 12, up: (t) => mainUp(0.21 + t * 0.06), creaseAngle: deg(30) });
 
-  // ball knuckle + static collar on the skull
-  const knuckleGeo = new THREE.SphereGeometry(0.05, 28, 18);
+  const knuckleGeo = new THREE.SphereGeometry(0.045, 24, 16);
+  knuckleGeo.translate(knuckleC.x, knuckleC.y, knuckleC.z);
   const collarGeo = geo.ringStack([
-    [0.044, -0.03], [0.044, 0.016], [0.05, 0.026], [0.064, 0.03], [0.078, 0.022], [0.088, 0.004], [0.092, -0.04],
+    [0.04, -0.04], [0.04, 0.012], [0.046, 0.024], [0.062, 0.03], [0.078, 0.022], [0.088, 0.004], [0.092, -0.05],
   ], 48);
-  const collarPos = skullLocal.clone().addScaledVector(skullN, -0.01);
-  // bolts around the collar (static)
   const boltParts = [];
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2 + 0.3;
-    const bg = new THREE.CylinderGeometry(0.007, 0.007, 0.01, 10);
+    const bg = new THREE.CylinderGeometry(0.0065, 0.0065, 0.01, 10);
     bg.rotateX(Math.PI / 2);
-    bg.translate(Math.cos(a) * 0.071, Math.sin(a) * 0.071, 0.027);
-    boltParts.push(bg);
+    bg.translate(Math.cos(a) * 0.07, Math.sin(a) * 0.07, 0.027);
+    boltParts.push(bg.toNonIndexed());
+    bg.dispose();
   }
   const boltGeo = geo.mergeGeometries(boltParts, false);
   boltParts.forEach((g) => g.dispose());
@@ -226,57 +202,57 @@ export function build(ctx) {
   const fins = {};
   for (const side of [1, -1]) {
     const key = side > 0 ? 'L' : 'R';
-    const G = side > 0 ? (g) => g : mirror;
+    const Gm = side > 0 ? (g) => g : mirror;
     const sx = (v) => V(v.x * side, v.y, v.z);
     const space = ctx.space(`fin${key}`, 'local');
 
-    // static socket collar on the skull
-    const collar = new THREE.Group();
-    collar.name = `fins.socket.${key}`;
-    collar.position.copy(sx(collarPos));
-    geo.faceDirection(collar, sx(skullN));
-    collar.add(ctx.mesh(collarGeo, socketMat, `fins.collar.${key}`));
-    collar.add(ctx.mesh(boltGeo, darkMat, `fins.bolts.${key}`));
-    space.add(collar);
+    const socket = new THREE.Group();
+    socket.name = `fins.socket.${key}`;
+    socket.position.copy(sx(skullLocal));
+    geo.faceDirection(socket, sx(skullN));
+    socket.add(ctx.mesh(collarGeo, socketMat, `fins.collar.${key}`));
+    socket.add(ctx.mesh(boltGeo, darkMat, `fins.bolts.${key}`));
+    space.add(socket);
 
-    // moving assembly
     const pivot = new THREE.Group();
     pivot.name = `fins.pivot.${key}`;
     space.add(pivot);
-    pivot.add(ctx.mesh(knuckleGeo, knuckleMat, `fins.knuckle.${key}`));
-    pivot.add(ctx.mesh(G(armGeo), armMat, `fins.arm.${key}`));
-    pivot.add(ctx.mesh(G(bladeGeo), bladeMat, `fins.blade.${key}`));
-    pivot.add(ctx.mesh(G(edgeGeo), edgeMat, `fins.edge.${key}`));
+    pivot.add(ctx.mesh(Gm(knuckleGeo), knuckleMat, `fins.knuckle.${key}`));
+    pivot.add(ctx.mesh(Gm(armGeo), bracketMat, `fins.bracket.${key}`));
+    pivot.add(ctx.mesh(Gm(bladeGeo), bladeMat, `fins.blade.${key}`));
+    pivot.add(ctx.mesh(Gm(ridgeGeo), ridgeMat, `fins.ridge.${key}`));
+    pivot.add(ctx.mesh(Gm(edgeGeo), edgeMat, `fins.edge.${key}`));
 
-    const prongPivot = new THREE.Group();
-    prongPivot.name = `fins.prongPivot.${key}`;
-    prongPivot.position.copy(sx(prongRoot));
-    pivot.add(prongPivot);
-    const prong = ctx.mesh(G(prongGeo), prongMat, `fins.prong.${key}`);
-    prong.position.copy(sx(prongRoot)).negate();
-    prongPivot.add(prong);
-    // split axis: perpendicular to the blade face at the prong root
-    const splitAxis = sx(faceUp(prongCurve, 0.15)(1)).normalize();
-
-    fins[key] = { side, pivot, prongPivot, splitAxis };
+    const innerPivot = new THREE.Group();
+    innerPivot.name = `fins.innerPivot.${key}`;
+    innerPivot.position.copy(sx(innerRoot));
+    pivot.add(innerPivot);
+    const inner = ctx.mesh(Gm(innerGeo), innerMat, `fins.inner.${key}`);
+    inner.position.copy(sx(innerRoot)).negate();
+    innerPivot.add(inner);
+    // split axis: horizontal, perpendicular to the head's front-back axis
+    fins[key] = { side, pivot, innerPivot };
   }
 
-  const params = { flare: 0, sweep: 0, split: 0 };
+  const params = { flare: 0, sweep: 0, split: 0, idle: 0 };
+  const pose = (p, extra = 0) => {
+    for (const f of Object.values(fins)) {
+      f.pivot.rotation.set(p.sweep, 0, f.side * (p.flare + extra));
+      f.innerPivot.rotation.set(0, 0, -f.side * p.split * 0.08);
+    }
+  };
   return {
     params,
     paramSpec: {
-      flare: { min: -0.5, max: 0.5, step: 0.01 },
+      flare: { min: -0.4, max: 0.6, step: 0.01 },
       sweep: { min: -0.5, max: 0.5, step: 0.01 },
       split: { min: -0.3, max: 1, step: 0.01 },
+      idle: { min: 0, max: 0.1, step: 0.005 },
     },
-    apply(p) {
-      for (const f of Object.values(fins)) {
-        // flare swings the blade outward about the head's front-back axis,
-        // sweep swings it fore/aft about the X axis (both from the root)
-        f.pivot.rotation.set(p.sweep, 0, f.side * p.flare);
-        // split opens the fork: prong tip swings in toward the skull
-        f.prongPivot.quaternion.setFromAxisAngle(f.splitAxis, -f.side * p.split * 0.28);
-      }
+    apply(p) { pose(p); },
+    update(t, dt, p) {
+      if (!p.idle) return;
+      pose(p, p.idle * Math.sin(t * 0.7));
     },
   };
 }
