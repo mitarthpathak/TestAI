@@ -42,16 +42,32 @@ export function build(ctx) {
   const J = V(...anatomy.JOINTS.finL.pos);
   const toLocal = (p) => p.clone().sub(J);
 
-  // main blade centre line: top spike -> root -> outer bow -> forward tip
+  // main blade centre line: top spike -> temple root -> down the back of the
+  // cheek disc -> wraps under it -> hooks forward/inward to a tusk point at
+  // about mouth level. The lower half is authored in the cheek-disc frame so
+  // it hugs the disc band (front spread ~1.3x head half-width).
+  const DC = V(...anatomy.LANDMARKS.cheekDiscL);
+  const DN = V(...anatomy.LANDMARKS.cheekDiscNormalL).normalize();
+  const DX = V(0, 1, 0).cross(DN).normalize(); // back / ear side
+  const DY = V(0, 0, 0).crossVectors(DN, DX).normalize(); // ~up
+  const RK = anatomy.LANDMARKS.cheekDiscRadius / 0.27;
+  const disc = (deg, r, h) => {
+    const a = THREE.MathUtils.degToRad(deg);
+    return DC.clone().addScaledVector(DX, r * RK * Math.cos(a)).addScaledVector(DY, r * RK * Math.sin(a)).addScaledVector(DN, h);
+  };
   const mainPts = [
-    V(0.62, 1.67, -0.07),
-    V(0.735, 1.535, -0.03),
-    V(0.895, 1.31, 0.005),
-    V(1.055, 1.0, 0.035),
-    V(1.14, 0.67, 0.085),
-    V(1.11, 0.37, 0.165),
-    V(0.965, 0.12, 0.265),
-    V(0.74, -0.04, 0.37),
+    V(0.5, 1.7, -0.1),
+    V(0.62, 1.56, 0.0),
+    V(0.745, 1.36, 0.08),
+    V(0.84, 1.13, 0.11),
+    disc(52, 0.6, 0.0),
+    disc(18, 0.56, 0.02),
+    disc(-24, 0.52, 0.05),
+    disc(-58, 0.46, 0.09),
+    disc(-86, 0.42, 0.13),
+    disc(-106, 0.39, 0.2),
+    disc(-122, 0.38, 0.28),
+    disc(-136, 0.4, 0.37),
   ].map(toLocal);
   const mainCurve = new THREE.CatmullRomCurve3(mainPts, false, 'centripetal');
 
@@ -61,7 +77,9 @@ export function build(ctx) {
     const p = curve.getPointAt(t);
     const out = V(p.x - headAxisLocal.x, 0, p.z - headAxisLocal.z).normalize();
     const fwd = V(0.12, 0.28 - 0.3 * t, 0.95).normalize();
-    return fwd.multiplyScalar(0.78).addScaledVector(out, 0.5 + bias).normalize();
+    const base = fwd.multiplyScalar(0.78).addScaledVector(out, 0.5 + bias).normalize();
+    // lower half: broad face turns to the cheek-disc normal (faces out/forward)
+    return base.lerp(DN, 0.75 * S(t, 0.3, 0.6)).normalize();
   };
 
   const lerpKeys = (keys) => (t) => {
@@ -75,8 +93,8 @@ export function build(ctx) {
     return keys[keys.length - 1][1];
   };
   // half width across the face and half thickness
-  const mainW = lerpKeys([[0, 0.004], [0.05, 0.034], [0.15, 0.06], [0.38, 0.068], [0.62, 0.062], [0.82, 0.046], [0.94, 0.024], [1, 0.003]]);
-  const mainH = lerpKeys([[0, 0.006], [0.1, 0.02], [0.7, 0.021], [0.93, 0.013], [1, 0.004]]);
+  const mainW = lerpKeys([[0, 0.004], [0.05, 0.036], [0.15, 0.062], [0.4, 0.072], [0.66, 0.068], [0.84, 0.05], [0.95, 0.026], [1, 0.003]]);
+  const mainH = lerpKeys([[0, 0.008], [0.1, 0.03], [0.55, 0.036], [0.8, 0.034], [0.94, 0.02], [1, 0.005]]);
 
   /**
    * Faceted blade section: flat back, chamfered edges, flat face with a low
@@ -84,7 +102,7 @@ export function build(ctx) {
    */
   const bladeSection = (Wf, Hf, ridge = 0.35) => (t) => {
     const W = Wf(t), H = Hf(t);
-    const b = Math.min(0.013, W * 0.38);
+    const b = Math.min(0.022, W * 0.42);
     return [
       [W, -0.1 * H],
       [W - 0.25 * b, 0.55 * H],
@@ -119,7 +137,7 @@ export function build(ctx) {
   const prongW = lerpKeys([[0, 0.003], [0.07, 0.016], [0.25, 0.024], [0.8, 0.026], [1, 0.026]]);
   const prongH = lerpKeys([[0, 0.005], [0.12, 0.013], [1, 0.015]]);
   const prongPts = [];
-  const PR = 12, P_T0 = 0.0, P_T1 = 0.5;
+  const PR = 12, P_T0 = 0.0, P_T1 = 0.4;
   for (let i = 0; i <= PR; i++) {
     const s = i / PR;
     const t = P_T0 + s * (P_T1 - P_T0);
