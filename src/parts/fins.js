@@ -92,13 +92,14 @@ export function build(ctx) {
     return k[k.length - 1][1];
   };
   // half width across the face / half thickness
-  const mainW = keys([[0, 0.004], [0.06, 0.04], [0.16, 0.07], [0.38, 0.086], [0.62, 0.08], [0.82, 0.055], [0.94, 0.026], [1, 0.002]]);
-  const mainH = keys([[0, 0.006], [0.08, 0.02], [0.3, 0.025], [0.7, 0.024], [0.9, 0.016], [1, 0.003]]);
+  // concept art: thick, broad BLADES (not wires) with a heavy bevel
+  const mainW = keys([[0, 0.006], [0.06, 0.055], [0.16, 0.095], [0.38, 0.118], [0.62, 0.11], [0.82, 0.08], [0.94, 0.04], [1, 0.004]]);
+  const mainH = keys([[0, 0.008], [0.08, 0.028], [0.3, 0.036], [0.7, 0.034], [0.9, 0.024], [1, 0.005]]);
 
   /** Lens / blade section with chamfered bevels (CCW, x across, y face). */
   const lens = (Wf, Hf) => (t) => {
     const W = Wf(t), H = Hf(t);
-    const b = Math.min(0.018, W * 0.35);
+    const b = Math.min(0.026, W * 0.35);
     return [
       [W, 0], [W - 0.35 * b, 0.45 * H], [W - b, 0.85 * H], [W - 2.2 * b, H],
       [-W + 2.2 * b, H], [-W + b, 0.85 * H], [-W + 0.35 * b, 0.45 * H], [-W, 0],
@@ -142,7 +143,9 @@ export function build(ctx) {
     });
   };
   // raised spine along the face (slightly toward the inner edge)
-  const ridgeGeo = rideStrip(0.1, 0.9, -0.12, 0.95, geo.roundedSection(0.011, 0.006, 3, 12), 90, (s) => [0.4 + 0.6 * Math.sin(Math.PI * s), 1]);
+  const ridgeGeo = rideStrip(0.1, 0.9, -0.3, 0.97, geo.roundedSection(0.011, 0.006, 3, 12), 90, (s) => [0.4 + 0.6 * Math.sin(Math.PI * s), 1]);
+  // dark panel line running down the blade face
+  const grooveGeo = rideStrip(0.08, 0.92, 0.22, 0.99, geo.roundedSection(0.0045, 0.0035, 2, 8), 90, (s) => [0.5 + 0.5 * Math.sin(Math.PI * s), 1]);
   // polished outer bevel strip
   const edgeGeo = rideStrip(0.06, 0.93, 0.8, 0.55, geo.roundedSection(0.005, 0.004, 2, 8), 90, (s) => 0.5 + 0.5 * Math.sin(Math.PI * s));
 
@@ -222,6 +225,7 @@ export function build(ctx) {
     pivot.add(ctx.mesh(Gm(bladeGeo), bladeMat, `fins.blade.${key}`));
     pivot.add(ctx.mesh(Gm(ridgeGeo), ridgeMat, `fins.ridge.${key}`));
     pivot.add(ctx.mesh(Gm(edgeGeo), edgeMat, `fins.edge.${key}`));
+    pivot.add(ctx.mesh(Gm(grooveGeo), darkMat, `fins.groove.${key}`));
 
     const innerPivot = new THREE.Group();
     innerPivot.name = `fins.innerPivot.${key}`;

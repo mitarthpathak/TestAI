@@ -58,7 +58,7 @@ export function build(ctx) {
     cavity: M.get('cavity'),
   };
   // close-up reference: light polished steel on the lower face
-  for (const k of ['column', 'carrier', 'chin', 'muzzle', 'sideA', 'sideB', 'sideC', 'base']) { mat[k].envMapIntensity = 2.0; mat[k].roughness = Math.max(mat[k].roughness, 0.36); }
+  for (const k of ['column', 'carrier', 'chin', 'muzzle', 'sideA', 'sideB', 'sideC', 'base']) { mat[k].envMapIntensity = 2.4; mat[k].roughness = Math.max(mat[k].roughness, 0.42); }
 
   // ------------------------------------------------------------ shared helpers
   const _t = new V3();
@@ -144,7 +144,7 @@ export function build(ctx) {
       const y = lerp(CARRIER_BOT, CARRIER_TOP, b);
       const x = a * xHalf(y);
       const roll = Math.pow(Math.abs(a), 4) * 0.02; // ends roll back into the face
-      return frontPt(x, y, 0.004 - roll, t);
+      return frontPt(x, y, -0.008 - roll, t);
     };
     const out = (a, b) => frontOut(a * 0.25, lerp(CARRIER_BOT, CARRIER_TOP, b));
     root.add(ctx.mesh(plate({ a0: -1, a1: 1, b0: 0, b1: 1, S, out, thickness: 0.04, bevel: 0.012, segU: 40, segV: 10 }), mat.carrier, 'jaw.carrier'));
@@ -152,18 +152,19 @@ export function build(ctx) {
 
   // ------------------------------------------------------------ central column
   const COL_TOP = MOUTH_Y - 0.078;
-  const COL_BOT = -0.27;
-  const colW = (y) => lerp(0.066, 0.078, sstep(y, COL_BOT, COL_TOP));
+  const COL_BOT = -0.085; // the column ends on the chin button
+  // vase-shaped column (close-up): waisted in the middle, flares into the button ring
+  const colW = (y) => 0.07 - 0.012 * Math.exp(-Math.pow((y - 0.03) / 0.09, 2)) + 0.03 * sstep(-y, 0.0, -COL_BOT + 0.01);
   {
     const S = (a, b, t) => {
       const y = lerp(COL_BOT, COL_TOP, b);
       const x = a * colW(y);
       return frontPt(x, y, 0.034 - 0.014 * Math.pow(Math.abs(a), 3) - 0.02 * sstep(-y, 0.12, 0.27), t);
     };
-    const out = (a, b) => frontOut(a * colW(0), lerp(COL_BOT, COL_TOP, b));
+    const out = (a, b) => frontOut(a * 0.07, lerp(COL_BOT, COL_TOP, b));
     root.add(ctx.mesh(plate({ a0: -1, a1: 1, b0: 0, b1: 1, S, out, thickness: 0.045, bevel: 0.012, segU: 20, segV: 16 }), mat.column, 'jaw.column'));
     // fine horizontal step seams across the column (close-up)
-    for (const [k, yy] of [[0, 0.07], [1, -0.04], [2, -0.15]]) {
+    for (const [k, yy] of [[0, 0.07], [1, -0.03]]) {
       const pts = [];
       for (let i = 0; i <= 8; i++) {
         const x = lerp(-0.9, 0.9, i / 8) * colW(yy);
@@ -193,11 +194,10 @@ export function build(ctx) {
     };
     const out = (a, b) => frontOut(lerp(0.12, 0.25, a), lerp(yb, yt, b));
     // layered: the upper plate overlaps the lower one (scale-like steps)
-    pair(plate({ a0: 0, a1: 1, b0: 0.62, b1: 1, S: mk(0.026), out, thickness: 0.045, bevel: 0.01, gap: 0.003, segU: 16, segV: 8 }), mat.muzzle, 'jaw.muzzle', root);
-    pair(plate({ a0: 0, a1: 1, b0: 0.3, b1: 0.66, S: mk(0.017), out, thickness: 0.04, bevel: 0.009, gap: 0.003, segU: 16, segV: 8 }), mat.sideA, 'jaw.muzzle.mid', root);
-    pair(plate({ a0: 0, a1: 1, b0: 0, b1: 0.34, S: mk(0.008), out, thickness: 0.04, bevel: 0.008, gap: 0.003, segU: 16, segV: 8 }), mat.sideC, 'jaw.muzzle.low', root);
+    // one smooth sculpted muzzle plate per side (no grille steps)
+    pair(plate({ a0: 0, a1: 1, b0: 0, b1: 1, S: mk(0.02), out, thickness: 0.045, bevel: 0.012, gap: 0.003, segU: 16, segV: 20 }), mat.muzzle, 'jaw.muzzle', root);
     // bright seam rail along the outer edge of the muzzle plates
-    for (const side of [1, -1]) {
+    for (const side of []) {
       const pts = [];
       for (let i = 0; i <= 12; i++) {
         const y = lerp(yb + 0.02, yt, i / 12);
@@ -252,13 +252,13 @@ export function build(ctx) {
   btnSpin.name = 'jaw.button.spin';
   {
     let bb = 0.6;
-    const BTN_Y = -0.3; // LANDMARKS.chinButton is hidden behind the column in the close-up
+    const BTN_Y = -0.175; // concept 3/4: big round button on the front-bottom of the chin
     for (let i = 0; i < 40; i++) { const f = spineFrame(bb); bb = clamp(bb + (BTN_Y - f.y) * 1.2, 0, 1); }
     const f = spineFrame(bb);
     const p = chinS(0, bb, new V3());
     btnPivot.position.copy(p).add(new V3(0, f.ny, f.nz).multiplyScalar(0.004));
     geo.faceDirection(btnPivot, new V3(0, f.ny, f.nz).normalize());
-    const R = 0.04;
+    const R = 0.068;
     const seat = ctx.mesh(geo.ringStack([[R * 1.62, 0.004], [R * 1.55, 0.0], [R * 1.48, -0.012], [0, -0.012]], 64), mat.dark, 'jaw.button.seat');
     const ring = ctx.mesh(geo.ringStack([
       [R * 1.02, 0.008], [R * 1.06, 0.022], [R * 1.12, 0.028], [R * 1.2, 0.026], [R * 1.25, 0.016], [R * 1.32, 0.013], [R * 1.4, 0.012], [R * 1.45, 0.002], [R * 1.47, -0.01],
