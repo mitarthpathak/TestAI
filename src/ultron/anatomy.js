@@ -336,5 +336,6 @@ export const VIEWS = {
   closeup:      { azimuth: 12, elevation: 2,   distance: 4.6, target: [0, 2.3, 0.2] },
   film34:       { azimuth: 41, elevation: -28, distance: 12.6, fov: 14, target: [0, 1.95, 0.1] },
   filmfront:    { azimuth: 34, elevation: -5,  distance: 12.9, fov: 14, target: [0, 1.9, 0.1] },
+  back34:       { azimuth: 125, elevation: 6,  distance: 7.0, target: [0, 2.0, 0] },
   hero:         { azimuth: 0,  elevation: -4,  distance: 7.6, target: [0, 1.8, 0] },
 };
