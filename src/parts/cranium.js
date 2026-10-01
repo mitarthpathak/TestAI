@@ -1,8 +1,10 @@
 /**
  * PART: cranium — egg-shaped skull armour above the brow line plus the
  * top / back / sides of the head down to the neck (SPEC.md region):
- * central forehead crest, forehead + parietal lobes sweeping back in long
- * curved strips, temple layers with the fin-root sockets, side-of-head plates
+ * broad continuous central crest (from the nose board over the crown), a
+ * few BROAD forehead / parietal / temple plates whose seams are long sweeping
+ * curves ("( )" lobes in front view), temple plates beside the outer brow,
+ * fin-root seats, side-of-head plates
  * behind the cheek rings (z < 0.15), occiput plates meeting the neck, the
  * jaw-hinge caps and a dark under-shell that shows through every seam.
  * Joint: head. Authoring space: HEAD.
@@ -16,10 +18,12 @@
  * Every plate is clamped to the cranium region (inRegion) so it never
  * covers the brow ridge, eye sockets or cheek turbines.
  *
+ * Behind z = -0.18 the cranium geometry is pulled forward (backWarp) so the
+ * occiput is shorter than the shared shell, matching the film silhouettes.
+ *
  * Sub-meshes: cranium.core, cranium.core.sides, cranium.crest (group) ->
- * cranium.crest.flank.{L,R}, cranium.crest.base{0..2}, cranium.crest.rail{i}.{L,R},
- * cranium.crest.key, cranium.temple.shingle{A,B,C}.{k}.{L,R}, cranium.band{1..5}.{k}.{L,R} (+ .inset / .rivets),
- * cranium.glow.*, cranium.hinge.{L,R} (+ boss), cranium.temple.{L,R} (pivot
+ * cranium.crest.base{0..2}, cranium.band{1..5}.{k}.{L,R},
+ * cranium.hinge.{L,R} (+ boss), cranium.temple.{L,R} (pivot
  * group on the fin root, axis = shell normal) -> cranium.temple.ring{0,1}.{L,R}
  * (seat around the fin root; the root itself is left clear for the fins' collar)
  *
@@ -36,18 +40,39 @@ const DEG = Math.PI / 180;
 
 // Region contract (reference/SPEC.md): everything above the brow line, and
 // behind the cheek rings below it, down to where the neck enters.
-const BROW_Y = 1.16;
+const BROW_Y = 1.07;
 const SIDE_Z = 0.15;
 const LOW_Y = 0.26;
-const RIDGE_Y = 1.4; // top of the faceplate nose crest ridge (faceplate.nose.crest)
 // brow line: low at the nose (crest root), rising toward the temples (angry slant)
 const browY = (x) => {
-  const t = Math.min(1, Math.max(0, (Math.abs(x) - 0.08) / 0.5));
-  return BROW_Y - 0.01 + 0.07 * t * t * (3 - 2 * t);
+  const t = Math.min(1, Math.max(0, (Math.abs(x) - 0.1) / 0.5));
+  return BROW_Y - 0.015 + 0.13 * t * t * (3 - 2 * t);
 };
 function inRegion(P, m = 0) {
   if (P.y < LOW_Y - m) return false;
-  return P.y >= browY(P.x) - m || P.z <= SIDE_Z + m;
+  if (P.y >= browY(P.x) - m || P.z <= SIDE_Z + m) return true;
+  // temple front beside the outer brow / eye corner, above the cheek band
+  return Math.abs(P.x) > 0.6 - m && P.y > 1.06 - m;
+}
+
+// Back-of-skull pull-in: the film skull is shorter behind the fin roots than
+// the shared shell. Everything behind z = BACK_Z is compressed toward it
+// (smoothly, fading out low down where the neck enters).
+const BACK_Z = -0.18;
+const BACK_K = 0.72;
+function backWarp(THREE, g) {
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const z = p.getZ(i), y = p.getY(i);
+    const d = BACK_Z - z;
+    if (d <= 0) continue;
+    const ramp = THREE.MathUtils.smoothstep(d, 0, 0.3);
+    const fy = THREE.MathUtils.smoothstep(y, 0.35, 0.95);
+    p.setZ(i, z + (1 - BACK_K) * d * ramp * fy);
+  }
+  p.needsUpdate = true;
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
 }
 
 export function build(ctx) {
@@ -62,7 +87,6 @@ export function build(ctx) {
   const gunB = M.get('gunmetal', { panel: 5.0, seed: 29, lineWidth: 0.003, lineDepth: 0.85, roughness: 0.3 });
   const crestMat = M.get('chrome', { roughness: 0.24, panel: 2.2, seed: 3, lineWidth: 0.003, lineDepth: 0.6 });
   const trimMat = M.get('chrome', { roughness: 0.14 });
-  const darkTrim = M.get('darkMetal', { panel: 6, seed: 5, lineWidth: 0.003 });
   const seamGlow = M.get('redAccent', { intensity: 0.9 });
 
   // ------------------------------------------------------------ charts
@@ -93,7 +117,7 @@ export function build(ctx) {
     const m = 0.05;
     const cap = geo.surfaceSheet({
       surface: field.surfaceFn, normal: field.normalFn,
-      u0: -Math.PI, u1: Math.PI, y0: BROW_Y - 0.01 - m, y1: 1.995, segU: 160, segV: 48, offset: -0.03,
+      u0: -Math.PI, u1: Math.PI, y0: 1.06, y1: 1.95, segU: 160, segV: 48, offset: -0.07,
     });
     root.add(ctx.mesh(cap, core, 'cranium.core'));
     // u at which the shell crosses z = zEdge at height y (front half -> back)
@@ -113,7 +137,7 @@ export function build(ctx) {
     const horseNorm = (s, y, N = new THREE.Vector3()) => field.normalAt(horseSurf(s, y, new THREE.Vector3()), N);
     const sideSheet = geo.surfaceSheet({
       surface: horseSurf, normal: horseNorm,
-      u0: -1, u1: 1, y0: LOW_Y - m, y1: BROW_Y - m + 0.01, segU: 120, segV: 60, offset: -0.03,
+      u0: -1, u1: 1, y0: LOW_Y - m, y1: BROW_Y - m + 0.01, segU: 120, segV: 60, offset: -0.07,
     });
     root.add(ctx.mesh(sideSheet, core, 'cranium.core.sides'));
   }
@@ -147,12 +171,12 @@ export function build(ctx) {
     const d = th / DEG;
     const up = THREE.MathUtils.smoothstep(d, 46, 96);
     const back = THREE.MathUtils.smoothstep(d, 120, 200);
-    return 0.075 + 0.075 * up - 0.06 * back;
+    return 0.1 + 0.1 * up - 0.08 * back;
   };
   const S0 = (th) => Math.asin(Math.min(0.95, crestW(th) / rMid(th)));
   //                  -30  0   30  60  90 120 150 180 210 240 270 300 330
-  const S1 = keyed([30, 30, 28, 17, 9.5, 10, 12, 15, 17, 19, 21, 23, 25]);
-  const S2 = keyed([55, 55, 50, 36, 23, 21, 23, 28, 32, 36, 40, 44, 48]);
+  const S1 = keyed([31, 31, 31, 29, 17, 16, 17, 19, 21, 22, 23, 24, 25]);
+  const S2 = keyed([55, 55, 52, 45, 31, 28, 29, 31, 34, 38, 41, 44, 48]);
   const S3 = keyed([72, 72, 67, 54, 41, 37, 40, 45, 50, 55, 59, 63, 67]);
   const S3b = keyed([78, 78, 76, 67, 57, 54, 56, 60, 64, 68, 71, 74, 77]);
   const S4 = keyed([84, 84, 83, 79, 74, 72, 73, 75, 78, 80, 82, 83, 84]);
@@ -165,36 +189,17 @@ export function build(ctx) {
   const crestGroup = new THREE.Group();
   crestGroup.name = 'cranium.crest';
   root.add(crestGroup);
-  // The faceplate's nose crest ridge (faceplate.nose.crest, x +-0.03) runs up
-  // the forehead to y ~1.4: below that the cranium crest is only two flank
-  // strips either side of a channel for that ridge; above it the full crest
-  // starts under a keystone cap that blends over the ridge end.
-  let thR = cr0;
-  {
-    let lo = cr0, hi = cr0 + 40;
-    for (let i = 0; i < 24; i++) { const m = 0.5 * (lo + hi); dome.chart(0, m * DEG, _P, _N); if (_P.y < RIDGE_Y) lo = m; else hi = m; }
-    thR = 0.5 * (lo + hi);
-  }
-  const tR = (thR - cr0) / (cr1 - cr0);
+  // One broad, continuous central crest from the top of the nose board up
+  // over the crown (ultron-front.png), split only where the skull turns
+  // (forehead / crown / occiput). The nose board's top tucks under its front.
   const crestLift = (s) => {
     const e = Math.abs(2 * s - 1);
-    // stepped flank: outer 24% sits one step lower
-    const step = 1 - THREE.MathUtils.smoothstep(e, 0.7, 0.76);
-    const groove = Math.exp(-Math.pow((2 * s - 1) / 0.07, 2));
-    return 0.002 + 0.01 * step - 0.006 * groove;
+    // stepped flank: outer 22% sits one step lower; shallow central groove
+    const step = 1 - THREE.MathUtils.smoothstep(e, 0.72, 0.78);
+    const groove = Math.exp(-Math.pow((2 * s - 1) / 0.06, 2));
+    return 0.002 + 0.01 * step - 0.005 * groove;
   };
-  for (const side of [1, -1]) {
-    const g = ribbonPlate(THREE, geo, {
-      chart: dome.chart,
-      railA: (t) => { const th = crestTh(tR * t + 0.004); return [side * Math.asin(0.045 / rMid(th)), th]; },
-      railB: (t) => { const th = crestTh(tR * t + 0.004); return [side * S0(th), th]; },
-      segS: 6, segT: 24, offset: 0.022, thickness: 0.05, bevel: 0.008, gapA: 0, gapB: 0, gap0: 0, gap1: 0,
-      lift: (s) => 0.006 * Math.sin(Math.PI * Math.min(1, s * 1.6)),
-    });
-    addPlate(g, crestMat, `cranium.crest.flank.${side > 0 ? 'L' : 'R'}`, 'crest', crestGroup);
-  }
-  // segmented along its length (forehead / crown / occiput) like the film crest
-  const crestSegs = [[tR, tR + (1 - tR) * 0.3], [tR + (1 - tR) * 0.3, tR + (1 - tR) * 0.64], [tR + (1 - tR) * 0.64, 1]];
+  const crestSegs = [[0, 0.34], [0.34, 0.66], [0.66, 1]];
   crestSegs.forEach(([c0, c1], i) => {
     const g = ribbonPlate(THREE, geo, {
       chart: dome.chart,
@@ -202,35 +207,11 @@ export function build(ctx) {
       railB: (t) => { const th = crestTh(c0 + (c1 - c0) * t); return [S0(th), th]; },
       segS: 16, segT: Math.round(120 * (c1 - c0)) + 6, offset: 0.024 - 0.004 * (i % 2), thickness: 0.06, bevel: 0.01,
       gapA: 0, gapB: 0, gap0: i ? 0.005 : 0, gap1: i < 2 ? 0.005 : 0,
-      lift: crestLift,
+      // the forehead segment rises at its front to meet the nose board
+      lift: (s, t) => crestLift(s) + (i === 0 ? 0.016 * (1 - THREE.MathUtils.smoothstep(t, 0, 0.35)) : 0),
     });
     addPlate(g, i === 1 ? chromeB : crestMat, `cranium.crest.base${i}`, 'crest', crestGroup);
-    for (const side of [1, -1]) {
-      const a = Math.max(tR + 0.05, c0), b = Math.min(0.92, c1);
-      if (b - a < 0.05) continue;
-      const r = ribbonPlate(THREE, geo, {
-        chart: dome.chart,
-        railA: (t) => { const th = crestTh(a + (b - a) * t); return [side * S0(th) * 0.16, th]; },
-        railB: (t) => { const th = crestTh(a + (b - a) * t); return [side * S0(th) * 0.58, th]; },
-        segS: 6, segT: Math.round(90 * (b - a)) + 6, offset: 0.042 - 0.004 * (i % 2), thickness: 0.03, bevel: 0.006,
-        gapA: 0, gapB: 0, gap0: 0.012, gap1: 0.012,
-        lift: (s) => 0.003 * Math.sin(Math.PI * s),
-      });
-      addPlate(r, trimMat, `cranium.crest.rail${i}.${side > 0 ? 'L' : 'R'}`, 'crest', crestGroup);
-    }
   });
-  // keystone cap over the end of the faceplate nose ridge (y ~1.4)
-  {
-    const k0 = thR - 2.5, k1 = thR + 9;
-    const g = ribbonPlate(THREE, geo, {
-      chart: dome.chart,
-      railA: (t) => { const th = (k0 + (k1 - k0) * t) * DEG; return [-S0(th) * (0.62 - 0.25 * t), th]; },
-      railB: (t) => { const th = (k0 + (k1 - k0) * t) * DEG; return [S0(th) * (0.62 - 0.25 * t), th]; },
-      segS: 8, segT: 14, offset: 0.058, thickness: 0.032, bevel: 0.006, gap: 0.0, gap0: 0.0, gap1: 0.0,
-      lift: (s) => 0.004 * (1 - Math.pow(Math.abs(2 * s - 1), 4)),
-    });
-    addPlate(g, chromeB, 'cranium.crest.key', 'crest', crestGroup);
-  }
 
   // ------------------------------------------------------------ 4. flowing bands
   // band between seams lo/hi. `keys` are theta cuts (deg); the first / last
@@ -267,7 +248,7 @@ export function build(ctx) {
         segS: o.segS ?? 8,
         segT: Math.max(8, Math.round(lenDeg * 0.45)),
         offset: off, thickness: o.thickness ?? 0.05, bevel: o.bevel ?? 0.006,
-        gapA: o.gapA ?? 0.009, gapB: o.gapB ?? 0.009,
+        gapA: o.gapA ?? 0.007, gapB: o.gapB ?? 0.007,
         gap0: k === 0 ? o.gapFront ?? 0.004 : o.gapCut ?? 0.006,
         gap1: k === cuts.length - 2 ? o.gapBack ?? 0.004 : o.gapCut ?? 0.006,
         lift: (s, t) => lift(s, t, k) - (k === 0 && o.tuck ? o.tuck * (1 - THREE.MathUtils.smoothstep(t, 0, 0.18)) : 0),
@@ -299,68 +280,27 @@ export function build(ctx) {
       }
     }
   };
-  // insets: long strips that follow the band flow, or short stepped end tabs
-  const insetEvery = (salt, prob = 0.6) => (k, lenDeg) => {
-    if (lenDeg < 14 || rnd(k, salt) > prob) return null;
-    if (rnd(k, salt + 11) < 0.35) return [[0.2, 0.62, 0.08, 0.38], [0.38, 0.8, 0.55, 0.9]];
-    const r = rnd(k, salt + 1);
-    if (r < 0.6) {
-      const a = 0.24 + 0.14 * rnd(k, salt + 2);
-      return [a, a + 0.24 + 0.12 * rnd(k, salt + 3), 0.08 + 0.1 * rnd(k, salt + 4), 0.8 + 0.1 * rnd(k, salt + 5)];
-    }
-    return rnd(k, salt + 6) < 0.5 ? [0.22, 0.78, 0.07, 0.35] : [0.22, 0.78, 0.6, 0.93];
-  };
-
-  // band 1 — forehead lobes: from the brow line, tapering into the crown, down the back
-  band('band1', S0, S1, [30, [84, 78], [122, 128], [160, 164], 240],
-    { mat: (k) => (k === 1 ? gunB : k % 2 ? chromeB : chromeA), offset: 0.02, stagger: 0.008, gapA: 0.016, gapB: 0.008, tuck: 0.014, lift: (s) => crown(0.01)(s), rivets: 41,
-      inset: (k) => (k === 0 ? [[0.42, 0.82, 0.35, 0.62], [0.3, 0.7, 0.7, 0.92]] : k === 1 ? [[0.3, 0.75, 0.1, 0.4], [0.3, 0.75, 0.55, 0.88]] : k === 2 ? [0.3, 0.8, 0.15, 0.7] : null) });
-  // band 2 — long sweep from the brow corner back over the skull
-  band('band2', S1, S2, [30, [70, 76], [100, 96], [130, 126], [160, 156], [192, 194], 250],
-    { mat: (k) => (k % 2 ? gunA : chromeA), offset: 0.006, stagger: 0.01, tuck: 0.008, gapB: 0.008, lift: (s) => crown(0.01)(s), inset: insetEvery(2, 0.55), rivets: 42 });
+  // Few BROAD plates with long sweeping seams (film / ultron-front.png):
+  // a big forehead lobe either side of the crest whose outer seam arcs from
+  // the brow's outer corner up and back over the crown, then one parietal
+  // sweep, one temple arc and the side plates around the jaw hinge. Each band
+  // is cut only where the skull turns (crown -> back), never in narrow strips.
+  // Plates sit lower toward the back of the skull so they add no bulk there.
+  // band 1 — forehead lobes: from the brow line over the crown
+  band('band1', S0, S1, [30, [150, 146], 240],
+    { mat: chromeA, offset: 0.018, stagger: -0.008, gapA: 0.006, gapB: 0.007, tuck: 0, lift: (s) => crown(0.012)(s) });
+  // band 2 — parietal sweep from the brow corner back over the skull
+  band('band2', S1, S2, [30, [128, 122], 250],
+    { mat: chromeB, offset: 0.008, stagger: -0.006, tuck: 0, gapB: 0.007, lift: (s) => crown(0.012)(s) });
   // band 3 — temple: arcs over the ear from the temple to the back of the head
-  band('band3', S2, S3, [20, [86, 80], [114, 110], [142, 138], [172, 170], [204, 206], [232, 236], 280],
-    { mat: (k) => (k % 2 ? chromeB : k % 4 === 0 ? gunB : gunA), offset: 0.014, stagger: -0.008, gapB: 0.008, lift: (s) => crown(0.009)(s), inset: insetEvery(3, 0.5), rivets: 43 });
-  // band 4 — side of the head behind the cheek ring, shingled over band 3
-  band('band4', S3, S3b, [0, [96, 94], [130, 132], [166, 168], [204, 208], [240, 244], 300],
-    { mat: (k) => (k % 2 ? gunA : chromeA), offset: 0.024, stagger: 0.008, gapA: -0.012, gapB: 0.008, lift: (s) => crown(0.008)(s), inset: insetEvery(4, 0.45) });
+  band('band3', S2, S3, [20, [118, 112], [214, 218], 280],
+    { mat: (k) => (k === 1 ? gunA : chromeA), offset: 0.014, stagger: -0.008, gapB: 0.01, lift: (s) => crown(0.01)(s) });
+  // band 4 — side of the head behind the cheek ring
+  band('band4', S3, S3b, [0, [140, 142], [236, 240], 300],
+    { mat: (k) => (k % 2 ? gunA : chromeB), offset: 0.02, stagger: -0.006, gapA: 0.004, gapB: 0.01, lift: (s) => crown(0.008)(s) });
   // band 5 — innermost arc around the jaw hinge
-  band('band5', S3b, S4, [-20, [70, 66], [160, 166], [250, 254], 320],
-    { mat: (k) => (k % 2 ? chromeB : gunB), offset: 0.006, stagger: 0.008, gapB: 0.008, segS: 8, lift: (s) => crown(0.007)(s), inset: insetEvery(5, 0.5) });
-
-  // temple shingles: short layered plates riding on the temple / brow-corner
-  // bands (the stacked look above and behind the cheek ring in the 3/4 ref)
-  const shift = (fn, d) => (th) => fn(th) + d * DEG;
-  band('temple.shingleA', shift(S1, 2.5), shift(S2, -3), [30, 120],
-    { mat: chromeB, offset: 0.03, maxLen: 26, gapA: 0.004, gapB: 0.004, gapFront: 0.012, lift: (s) => crown(0.008)(s) });
-  band('temple.shingleB', shift(S2, 2.5), shift(S3, -2.5), [20, 140],
-    { mat: gunA, offset: 0.036, maxLen: 34, gapA: 0.004, gapB: 0.004, gapFront: 0.012, lift: (s) => crown(0.008)(s) });
-  band('temple.shingleC', shift(S2, 6), shift(S3, -5), [20, 160],
-    { mat: chromeA, offset: 0.05, maxLen: 18, thickness: 0.03, gapA: 0.004, gapB: 0.004, gapFront: 0.03, lift: (s) => crown(0.006)(s) });
-
-  // ------------------------------------------------------------ 4b. red glowing seams (sparing)
-  {
-    const strip = (phiFn, th0, th1, dPhi, name) => {
-      const [a, b] = railRange(phiFn, th0, th1);
-      if (b - a < 4) return;
-      const P = new THREE.Vector3(), N = new THREE.Vector3();
-      const pts = [], nrm = [];
-      for (let i = 0; i <= 24; i++) {
-        const th = (a + (b - a) * (i / 24)) * DEG;
-        dome.chart(phiFn(th) + dPhi / rMid(th), th, P, N);
-        pts.push(P.clone().addScaledVector(N, 0.006));
-        nrm.push(N.clone());
-      }
-      const curve = new THREE.CatmullRomCurve3(pts);
-      const g = geo.sweptSection(curve, geo.roundedSection(0.002, 0.004, 2, 8), {
-        steps: 40, up: (t) => nrm[Math.round(t * 24)], scale: (t) => [1, Math.min(1, t * 8, (1 - t) * 8)],
-      });
-      root.add(ctx.mesh(g, seamGlow, `${name}.L`));
-      root.add(ctx.mesh(geo.mirrorGeometryX(g), seamGlow, `${name}.R`));
-    };
-    strip(S1, 30, 80, 0.0, 'cranium.glow.forehead');
-    strip(S2, 30, 70, 0.0, 'cranium.glow.temple');
-  }
+  band('band5', S3b, S4, [-20, [160, 166], 320],
+    { mat: (k) => (k % 2 ? chromeB : gunB), offset: 0.006, stagger: 0.006, gapB: 0.008, segS: 8, lift: (s) => crown(0.007)(s) });
 
   // ------------------------------------------------------------ 5. jaw-hinge caps (chart pole)
   {
@@ -415,6 +355,11 @@ export function build(ctx) {
     });
     addPair(g, mat, `cranium.temple.${nm}`, 'temple', temple);
   }
+
+  // ------------------------------------------------------------ back pull-in
+  root.updateMatrixWorld(true);
+  root.traverse((o) => { if (o.isMesh && o.parent === root) backWarp(THREE, o.geometry); });
+  crestGroup.traverse((o) => { if (o.isMesh) backWarp(THREE, o.geometry); });
 
   // ------------------------------------------------------------ params
   const center = new THREE.Vector3(0, 1.05, -0.05);

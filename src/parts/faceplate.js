@@ -3,16 +3,17 @@
  * Joints: head (nose, sockets, cheekbones, muzzle), browL / browR (brows).
  * Authoring space: HEAD.
  *
- *  - faceplate.nose            long, flat, broad board (y 1.15 -> 0.5), chamfered
- *    .crest / .keel / .panel / .tip   crest join, central ridge, raised lower
- *                              panel ("W" step), stepped nostril block
+ *  - faceplate.nose            long, broad, nearly flush board (y 1.12 -> 0.5),
+ *                              chamfered, fine engraved centre line; its top
+ *                              tucks under the cranium crest
+ *    .panel / .tip             raised lower panel ("W" step), stepped nostril block
  *  - faceplate.brow.{L,R}      heavy overhanging angry brow wedge (on browL/R)
  *    faceplate.browCap.{L,R}   stepped upper layer of the brow
  *  - faceplate.socket.{L,R}    squarish-almond socket frames with stepped bevels
- *  - faceplate.cheekbone{0,1,2}.{L,R}  stacked under-eye plates sweeping from
- *                              the nose edge to the inner/top edge of the cheek ring
+ *  - faceplate.cheekbone.sheet.{L,R}  one smooth curved under-eye sheet from the
+ *                              nose edge to the inner/top edge of the cheek ring,
+ *                              fine engraved seams radiating outward
  *  - faceplate.muzzle / .philtrum      stepped muzzle top above the upper lip
- *  - faceplate.seam*.{L,R}     faint red light deep in the cheekbone seams
  *
  * Params: browRaise (+ up), browAngle (+ angry: inner ends drop),
  *         noseFlex (scrunch), cheekFlex (sneer / cheekbones lift).
@@ -46,11 +47,11 @@ export function build(ctx) {
 
   const plate = M.get('chrome', { panel: 7, seed: 5, lineWidth: 0.0028, lineDepth: 0.75 });
   const bright = M.get('chrome', { roughness: 0.18, panel: 5.5, seed: 9, lineWidth: 0.0026, lineDepth: 0.7 });
+  const cheekMat = M.get('chrome', { roughness: 0.24, panel: 3.2, seed: 31, lineWidth: 0.0024, lineDepth: 0.6 });
   const gun = M.get('gunmetal', { panel: 8, seed: 13, lineWidth: 0.0028, lineDepth: 0.8 });
   const noseMat = M.get('chrome', { panel: 7, seed: 6, lineWidth: 0.0028, lineDepth: 0.75, roughness: 0.36 });
   const gunDS = M.get('gunmetal', { panel: 9, seed: 17, lineWidth: 0.0025, lineDepth: 0.7, side: THREE.DoubleSide });
   const dark = M.get('darkMetal', { panel: 10, seed: 21, lineWidth: 0.0025, side: THREE.DoubleSide });
-  const seamGlow = M.get('redAccent', { intensity: 1.3 });
 
   // rails: [x, y] front-view points converted to chart (u, y)
   const rail = (pts, mirror = 1) => {
@@ -84,8 +85,8 @@ export function build(ctx) {
   // flat board: its front face is a straight line in side view from the brow
   // junction (y 1.12, z ~0.79) down to the nose tip (0, 0.5, 0.9)
   const tip = anatomy.LANDMARKS.noseTip;
-  const noseFrontZ = (y) => lerp(0.768, tip[2], THREE.MathUtils.clamp((1.13 - y) / (1.13 - tip[1]), 0, 1.1));
-  const noseEdge = [[0.085, 1.16], [0.1, 1.1], [0.108, 1.02], [0.115, 0.93], [0.123, 0.84], [0.131, 0.75], [0.139, 0.66], [0.146, 0.58], [0.15, 0.53], [0.15, 0.5]];
+  const noseFrontZ = (y) => lerp(0.73, tip[2] - 0.012, THREE.MathUtils.clamp((1.13 - y) / (1.13 - tip[1]), 0, 1.1));
+  const noseEdge = [[0.074, 1.12], [0.082, 1.09], [0.094, 1.02], [0.108, 0.93], [0.124, 0.84], [0.142, 0.75], [0.16, 0.66], [0.176, 0.58], [0.185, 0.53], [0.188, 0.5]];
   const noseY = (t) => lerp(1.16, 0.5, t);
   const boardLift = (dz) => (s, t, P, N) => (noseFrontZ(P.y) + dz - P.z) / Math.max(0.5, N.z);
   {
@@ -93,30 +94,20 @@ export function build(ctx) {
     const base = boardLift(0);
     const g = ribbonPlate(THREE, geo, {
       chart, railA: rail(noseEdge, -1), railB: rail(noseEdge, 1),
-      segS: 28, segT: 60, offset: 0, thickness: 0.16, bevel: 0.008, gap: 0.006, gap0: 0, gap1: 0.002,
+      segS: 56, segT: 60, offset: 0, thickness: 0.12, bevel: 0.007, gap: 0.004, gap0: 0, gap1: 0.002,
       lift: (s, t, P, N) => {
         const e = Math.abs(2 * s - 1);
         // flat front, sharp 45deg chamfers on the sides, top rolls back into the crest
-        return base(s, t, P, N) - 0.012 * e * e - 0.026 * sm(e, 0.76, 1.0) - 0.02 * sm(t, 0.06, 0.0);
+        // fine engraved centre line down the upper board (film / concept)
+        const line = Math.exp(-Math.pow(e / 0.035, 2)) * sm(t, 0.04, 0.1) * (1 - sm(t, 0.4, 0.5));
+        return base(s, t, P, N) - 0.006 * e * e - 0.022 * sm(e, 0.7, 1.0) - 0.012 * sm(t, 0.08, 0.0) - 0.003 * line;
       },
     });
     inner.add(ctx.mesh(g, noseMat, 'faceplate.nose'));
 
-    // central keel ridge with a slot in the upper half (poster)
-    const keelEdge = [[0.024, 1.1], [0.022, 0.98], [0.02, 0.86], [0.018, 0.78]];
-    const kg = ribbonPlate(THREE, geo, {
-      chart, railA: rail(keelEdge, -1), railB: rail(keelEdge, 1),
-      segS: 10, segT: 24, offset: 0, thickness: 0.05, bevel: 0.004, gap: 0.0,
-      lift: (s, t, P, N) => {
-        const e = Math.abs(2 * s - 1);
-        const slot = (1 - sm(e, 0.25, 0.4)) * sm(t, 0.05, 0.15) * (1 - sm(t, 0.75, 0.9));
-        return base(s, t, P, N) + 0.008 - 0.012 * slot - 0.006 * sm(t, 0.8, 1.0);
-      },
-    });
-    inner.add(ctx.mesh(kg, plate, 'faceplate.nose.keel'));
 
     // raised lower panel (the "W" step): inset trapezoid on the lower board
-    const panelEdge = [[0.07, 0.84], [0.083, 0.76], [0.097, 0.68], [0.108, 0.62]];
+    const panelEdge = [[0.08, 0.82], [0.1, 0.74], [0.118, 0.67], [0.132, 0.6]];
     const pg = ribbonPlate(THREE, geo, {
       chart, railA: rail(panelEdge, -1), railB: rail(panelEdge, 1),
       segS: 16, segT: 24, offset: 0, thickness: 0.05, bevel: 0.005, gap: 0.0,
@@ -124,38 +115,27 @@ export function build(ctx) {
         const e = Math.abs(2 * s - 1);
         // two vertical grooves split the panel into a W-like triple
         const groove = Math.exp(-Math.pow((e - 0.42) / 0.06, 2));
-        return base(s, t, P, N) + 0.009 - 0.008 * groove;
+        return base(s, t, P, N) + 0.005 - 0.005 * groove;
       },
     });
     inner.add(ctx.mesh(pg, plate, 'faceplate.nose.panel'));
 
     // stepped "nostril" block at the bottom of the nose
-    const tipEdge = [[0.075, 0.6], [0.08, 0.55], [0.085, 0.51]];
+    const tipEdge = [[0.09, 0.59], [0.098, 0.55], [0.104, 0.51]];
     const tg = ribbonPlate(THREE, geo, {
       chart, railA: rail(tipEdge, -1), railB: rail(tipEdge, 1),
       segS: 14, segT: 14, offset: 0, thickness: 0.07, bevel: 0.006, gap: 0.0,
-      lift: (s, t, P, N) => base(s, t, P, N) + 0.008 + 0.01 * sm(t, 0.4, 0.5),
+      lift: (s, t, P, N) => base(s, t, P, N) + 0.005 + 0.006 * sm(t, 0.4, 0.5),
     });
     inner.add(ctx.mesh(tg, gun, 'faceplate.nose.tip'));
 
-    // crest join: narrow ridge from the nose top up the forehead to the cranium's crest
-    const crestEdge = [[0.03, 1.4], [0.032, 1.3], [0.04, 1.2], [0.06, 1.12]];
-    const cg = ribbonPlate(THREE, geo, {
-      chart, railA: rail(crestEdge, -1), railB: rail(crestEdge, 1),
-      segS: 12, segT: 28, offset: 0, thickness: 0.1, bevel: 0.006, gap: 0.004, gap0: 0, gap1: 0,
-      lift: (s, t, P, N) => {
-        const e = Math.abs(2 * s - 1);
-        const h = lerp(0.022, Math.max(0.022, noseFrontZ(P.y) - P.z - 0.03), sm(t, 0.55, 1.0));
-        return h - 0.012 * sm(e, 0.6, 1.0) + 0.006 * (1 - e);
-      },
-    });
-    inner.add(ctx.mesh(cg, plate, 'faceplate.nose.crest'));
+    // (the crest join above the nose is now the cranium's continuous crest)
   }
 
   // ------------------------------------------------------------ muzzle top (nose -> upper lip)
   {
     const inner = pivot('faceplate.muzzle', V(0, 0.42, 0.86));
-    const edge = [[0.17, 0.52], [0.205, 0.47], [0.232, 0.41], [0.246, 0.35], [0.25, 0.3]];
+    const edge = [[0.2, 0.52], [0.22, 0.47], [0.232, 0.41], [0.246, 0.35], [0.25, 0.3]];
     const mg = ribbonPlate(THREE, geo, {
       chart, railA: rail(edge, -1), railB: rail(edge, 1),
       segS: 30, segT: 26, offset: 0, thickness: 0.07, bevel: 0.008, gap: 0.006, gap0: 0.004, gap1: 0.0,
@@ -181,7 +161,7 @@ export function build(ctx) {
   // recessed layer behind the inner brow ends / nose top so no shell shows
   // through when the brows animate
   {
-    const gl = [[0.36, 1.21], [0.3, 1.19], [0.2, 1.16], [0.12, 1.1], [0.1, 1.0], [0.12, 0.93]];
+    const gl = [[0.36, 1.12], [0.3, 1.1], [0.2, 1.07], [0.12, 1.04], [0.1, 1.0], [0.12, 0.93]];
     const glA = rail(gl, -1), glB = rail(gl, 1);
     const g = ribbonPlate(THREE, geo, {
       chart, railA: glA, railB: glB, segS: 30, segT: 20, offset: 0, thickness: 0.08, bevel: 0.006, gap: 0.0,
@@ -219,78 +199,58 @@ export function build(ctx) {
     const browIn = pivot(`faceplate.brow.${key}`, V(bj[0], bj[1], bj[2]), browSpace);
     // lower edge = slanted upper lid line (inner low, outer high), hooding the socket top
     const browLowPts = [[0.1, 0.95], [0.15, 0.915], [0.21, 0.93], [0.28, 0.963], [0.35, 0.993], [0.42, 1.018], [0.49, 1.04], [0.55, 1.075], [0.6, 1.125]];
-    const browTopPts = [[0.09, 1.135], [0.17, 1.145], [0.26, 1.165], [0.35, 1.185], [0.44, 1.215], [0.52, 1.235], [0.575, 1.245], [0.62, 1.24]];
+    const browTopPts = [[0.085, 1.075], [0.16, 1.06], [0.25, 1.08], [0.34, 1.11], [0.43, 1.14], [0.51, 1.165], [0.57, 1.19], [0.62, 1.2]];
     const bLow = rail(browLowPts, side), bTop = rail(browTopPts, side);
     const bMid = mixRail(bLow, bTop, 0.58);
-    // overhang height above the shell: thick wedge along the lower edge
+    // overhang height above the shell: thick wedge along the lower edge,
+    // easing in at the nose (inner end tucks against the nose board) and
+    // thinning toward the temple; rolls smoothly back up into the forehead.
     const browH = (s, t) => {
-      const hl = lerp(0.084, 0.03, sm(t, 0.35, 1.0));
-      return 0.022 + (hl - 0.022) * Math.pow(1 - s, 1.4);
+      const hl = lerp(0.058, 0.094, sm(t, 0.0, 0.22)) - 0.07 * sm(t, 0.45, 1.0);
+      const top = 0.02 - 0.008 * sm(t, 0.6, 1.0);
+      return top + (hl - top) * Math.pow(1 - s, 1.25);
     };
     const brow = ribbonPlate(THREE, geo, {
-      chart, railA: bLow, railB: bMid, segS: 18, segT: 56, offset: 0, thickness: 0.15, bevel: 0.007,
-      gapA: 0, gapB: 0.005, gap0: 0.004, gap1: 0.006,
-      lift: (s, t) => {
-        const sl = s * 0.58;
-        // crisp secondary step a third of the way up
-        return browH(sl, t) + 0.006 * (1 - sm(s, 0.42, 0.47));
-      },
+      chart, railA: bLow, railB: bMid, segS: 20, segT: 60, offset: 0, thickness: 0.17, bevel: 0.009,
+      gapA: 0, gapB: 0.003, gap0: 0.004, gap1: 0.006,
+      lift: (s, t) => browH(s * 0.58, t),
     });
     browIn.add(ctx.mesh(brow, bright, `faceplate.brow.${key}`));
     const cap = ribbonPlate(THREE, geo, {
       chart, railA: bMid, railB: bTop, segS: 10, segT: 48, offset: 0, thickness: 0.1, bevel: 0.006,
-      gapA: 0.004, gapB: 0.0, gap0: 0.012, gap1: 0.01,
-      lift: (s, t) => browH(0.58 + 0.42 * s, t) - 0.004,
+      gapA: 0.003, gapB: 0.0, gap0: 0.008, gap1: 0.008,
+      lift: (s, t) => browH(0.58 + 0.42 * s, t) - 0.003,
     });
     browIn.add(ctx.mesh(cap, plate, `faceplate.browCap.${key}`));
-    {
-      // faint red light deep in the seam between the brow layers (concept / poster)
-      const P = new THREE.Vector3(), N = new THREE.Vector3();
-      const pts = [];
-      for (let k = 0; k <= 20; k++) {
-        const [u, y] = bMid(0.12 + 0.8 * (k / 20));
-        chart(u, y, P, N);
-        pts.push(P.clone().addScaledVector(N, browH(0.58, 0.12 + 0.8 * (k / 20)) - 0.012));
-      }
-      const sg = geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(0.0035, 0.0035, 2, 6), {
-        steps: 30, scale: (t) => Math.min(1, t * 6, (1 - t) * 6),
-      });
-      browIn.add(ctx.mesh(sg, seamGlow, `faceplate.browSeam.${key}`));
-    }
 
-    // ---------------------------------------------------------- cheekbone plates
-    // from the nose edge (inner rail) to the inner / top edge of the cheek ring
-    // (outer rail); split along t into stacked strips whose seams radiate outward
-    const cheekIn = [[0.124, 0.86], [0.13, 0.78], [0.136, 0.7], [0.142, 0.62], [0.148, 0.55], [0.152, 0.5]];
+    // ---------------------------------------------------------- cheekbone sheet
+    // ONE smooth curved sheet from the nose edge (inner rail) to the inner /
+    // top edge of the cheek ring (outer rail). Fine engraved seams radiate
+    // from the nose edge down / outward (concept 3/4): the outer rail is
+    // re-timed so each seam is a straight t = const line on the sheet.
+    const cheekIn = [[0.128, 0.86], [0.146, 0.78], [0.164, 0.7], [0.18, 0.62], [0.19, 0.55], [0.194, 0.5]];
     const cheekOut = [[0.43, 0.85], [0.37, 0.8], [0.318, 0.725], [0.282, 0.64], [0.262, 0.56], [0.252, 0.49]];
-    const rIn = rail(cheekIn, side), rOut = rail(cheekOut, side);
+    const rIn = rail(cheekIn, side), rOutRaw = rail(cheekOut, side);
+    // seams start high on the nose edge and land lower on the ring
+    const warpT = (t) => (t < 0.3 ? t * (0.46 / 0.3) : t < 0.62 ? 0.46 + ((t - 0.3) * 0.34) / 0.32 : 0.8 + ((t - 0.62) * 0.2) / 0.38);
+    const rOut = (t) => rOutRaw(warpT(t));
     const hingeP = V(0.2 * side, 0.7, surfZ(0.2, 0.7));
     const cheekG = pivot(`faceplate.cheekbone.${key}`, hingeP);
-    // seams start high on the nose edge and land lower on the ring: they radiate down/outward
-    const strips = [[0, 0.3, 0, 0.46, 0.04], [0.3, 0.62, 0.46, 0.8, 0.036], [0.62, 1, 0.8, 1, 0.032]];
-    strips.forEach(([t0, t1, o0, o1, h], i) => {
-      const g = ribbonPlate(THREE, geo, {
-        chart, railA: sub(rIn, t0, t1), railB: sub(rOut, o0, o1), segS: 22, segT: 18, offset: 0, thickness: 0.09,
-        bevel: 0.008, gapA: 0.006, gapB: 0.004, gap0: i ? 0.005 : 0.0, gap1: i < 2 ? 0.005 : 0.0,
-        lift: (s, t) => h + 0.012 * Math.sin(Math.PI * Math.min(1, s * 1.15)) * (i === 0 ? 1 : 0.6) - 0.008 * t * (i === 0 ? 0 : 1),
-      });
-      cheekG.add(ctx.mesh(g, i === 0 ? bright : plate, `faceplate.cheekbone${i}.${key}`));
-      // faint red light deep in the seam below each strip (poster)
-      if (i < 2) {
-        const P = new THREE.Vector3(), N = new THREE.Vector3();
-        const pts = [];
-        for (let k = 0; k <= 16; k++) {
-          const s = 0.06 + 0.84 * (k / 16);
-          const a = rIn(t1), b = rOut(o1);
-          chart(a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, P, N);
-          pts.push(P.clone().addScaledVector(N, 0.012));
+    const seams = [0.3, 0.62];
+    const g = ribbonPlate(THREE, geo, {
+      chart, railA: rIn, railB: rOut, segS: 24, segT: 170, offset: 0, thickness: 0.09,
+      bevel: 0.008, gapA: 0.005, gapB: 0.004, gap0: 0.0, gap1: 0.0,
+      lift: (s, t) => {
+        // flush with the nose board at the inner edge, rolling over the cheekbone
+        let h = 0.044 - 0.012 * s * s + 0.012 * Math.sin(Math.PI * Math.min(1, s * 1.1)) * (1 - 0.5 * t) - 0.01 * t * s;
+        for (const c of seams) {
+          const w = 0.006;
+          h -= 0.004 * Math.exp(-Math.pow((t - c) / w, 2)) * sm(s, 0.02, 0.12);
         }
-        const sg = geo.sweptSection(new THREE.CatmullRomCurve3(pts), geo.roundedSection(0.004, 0.004, 2, 6), {
-          steps: 24, scale: (t) => Math.min(1, t * 6, (1 - t) * 6),
-        });
-        cheekG.add(ctx.mesh(sg, seamGlow, `faceplate.seam${i}.${key}`));
-      }
+        return h;
+      },
     });
+    cheekG.add(ctx.mesh(g, cheekMat, `faceplate.cheekbone.sheet.${key}`));
   }
 
   // ------------------------------------------------------------ params
