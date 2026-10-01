@@ -32,8 +32,8 @@ export const JOINTS = {
   eyeR:   { parent: 'head',  space: 'head', pos: [-0.335, 0.93, 0.645] },
   browL:  { parent: 'head',  space: 'head', pos: [0.33, 1.08, 0.68] },
   browR:  { parent: 'head',  space: 'head', pos: [-0.33, 1.08, 0.68] },
-  cheekL: { parent: 'head',  space: 'head', pos: [0.5, 0.46, 0.42] },
-  cheekR: { parent: 'head',  space: 'head', pos: [-0.5, 0.46, 0.42] },
+  cheekL: { parent: 'head',  space: 'head', pos: [0.47, 0.46, 0.55] },  // turbine hub (triangulated from 3 refs)
+  cheekR: { parent: 'head',  space: 'head', pos: [-0.47, 0.46, 0.55] },
   finL:   { parent: 'head',  space: 'head', pos: [0.64, 1.6, -0.12] },
   finR:   { parent: 'head',  space: 'head', pos: [-0.64, 1.6, -0.12] },
   lipUpper: { parent: 'head', space: 'head', pos: [0, 0.27, 0.88] },
@@ -47,7 +47,9 @@ export const JOINTS = {
 // Proportions are measured from reference/ultron-front.png and the film
 // frames (scripts/overlay.mjs aligns renders to them by the eyes). With
 // E = eye spacing (0.67): crown 1.55E above the eyes, mouth 1.0E below,
-// chin bottom ~1.85E below, cheek-disc centres 0.7E below and 0.75E apart.
+// chin bottom ~1.85E below. Cheek-disc hubs were triangulated from the front,
+// film and 3/4 references (residual < 0.03E): 0.7E below the eyes, 1.4E
+// apart, recessed ~0.17 into the cheek just below / outside the eye.
 // ---------------------------------------------------------------------------
 export const LANDMARKS = {
   crownTop:     [0, 1.96, -0.12],
@@ -322,12 +324,14 @@ export function warpHeadNormal(p, n) {
 
 /** Camera presets used by the page and by the Playwright capture script. */
 export const VIEWS = {
-  // azimuth: degrees around Y towards the model's left (+X); elevation: degrees up
-  front:        { azimuth: 0,  elevation: -3, distance: 7.0, target: [0, 1.85, 0] },
-  threequarter: { azimuth: 36, elevation: 4,  distance: 7.0, target: [0, 1.9, 0] },
-  side:         { azimuth: 90, elevation: 0,  distance: 7.2, target: [0, 1.85, 0] },
-  closeup:      { azimuth: 12, elevation: 2,  distance: 4.6, target: [0, 2.3, 0.2] },
-  film34:       { azimuth: 42, elevation: -9, distance: 6.4, target: [0, 1.9, 0.1] },
-  filmfront:    { azimuth: 8,  elevation: -6, distance: 6.6, target: [0, 1.85, 0.1] },
-  hero:         { azimuth: 0,  elevation: -4, distance: 7.6, target: [0, 1.8, 0] },
+  // azimuth: degrees around Y towards the model's left (+X); elevation: degrees up.
+  // front / filmfront / threequarter / film34 are solved against the matching
+  // reference's landmarks (scripts/overlay.mjs pairs them by name).
+  front:        { azimuth: 1,  elevation: -6,  distance: 7.0, target: [0, 1.85, 0] },
+  threequarter: { azimuth: 38, elevation: -17, distance: 6.8, target: [0, 1.95, 0.1] },
+  side:         { azimuth: 90, elevation: 0,   distance: 7.2, target: [0, 1.85, 0] },
+  closeup:      { azimuth: 12, elevation: 2,   distance: 4.6, target: [0, 2.3, 0.2] },
+  film34:       { azimuth: 41, elevation: -28, distance: 6.4, target: [0, 1.95, 0.1] },
+  filmfront:    { azimuth: 34, elevation: -5,  distance: 6.6, target: [0, 1.9, 0.1] },
+  hero:         { azimuth: 0,  elevation: -4,  distance: 7.6, target: [0, 1.8, 0] },
 };
