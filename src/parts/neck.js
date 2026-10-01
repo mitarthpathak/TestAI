@@ -436,7 +436,7 @@ export function build(ctx) {
   const AXZ = -0.05;
   const bulk = (y) => {
     const t = THREE.MathUtils.smoothstep(y, 0.05, 1.45);
-    return { sx: THREE.MathUtils.lerp(1.62, 1.3, t), sz: THREE.MathUtils.lerp(1.34, 1.16, t) };
+    return { sx: THREE.MathUtils.lerp(2.05, 1.62, t), sz: THREE.MathUtils.lerp(1.55, 1.32, t) };
   };
   const bulkPoint = (v) => {
     const { sx, sz } = bulk(v.y);
@@ -495,17 +495,17 @@ export function build(ctx) {
     root.add(grp);
     const strands = [
       // [offset across (toward outside), offset out, half width, half thickness, material]
-      [0.0, 0.0, 0.085, 0.06, muscleTop],
-      [0.11, -0.03, 0.07, 0.05, muscleMat],
-      [-0.1, -0.04, 0.055, 0.045, muscleMat],
+      [0.0, 0.0, 0.13, 0.085, muscleTop],
+      [0.16, -0.04, 0.11, 0.075, muscleMat],
+      [-0.14, -0.05, 0.09, 0.065, muscleMat],
     ];
     strands.forEach(([dx, dn, hw, ht, mat], k) => {
       const pts = [
-        [0.54 * side + dx * side * 0.6, 1.52, -0.08 + dn],
-        [0.56 * side + dx * side, 1.12, 0.1 + dn],
-        [0.44 * side + dx * side * 0.8, 0.66, 0.3 + dn],
-        [0.24 * side + dx * side * 0.5, 0.3, 0.44 + dn],
-        [0.1 * side + dx * side * 0.3, 0.12, 0.5 + dn],
+        [0.5 * side + dx * side * 0.4, 1.5, -0.08 + dn],
+        [0.56 * side + dx * side * 0.6, 1.1, 0.16 + dn],
+        [0.5 * side + dx * side * 0.6, 0.66, 0.38 + dn],
+        [0.32 * side + dx * side * 0.5, 0.3, 0.54 + dn],
+        [0.13 * side + dx * side * 0.3, 0.1, 0.6 + dn],
       ].map((q) => new THREE.Vector3(...q));
       const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
       const g = geo.sweptSection(curve, geo.roundedSection(hw, ht, 3.2, 26), {

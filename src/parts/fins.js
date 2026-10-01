@@ -56,10 +56,10 @@ export function build(ctx) {
     return DC.clone().addScaledVector(DX, r * RK * Math.cos(a)).addScaledVector(DY, r * RK * Math.sin(a)).addScaledVector(DN, h);
   };
   const mainPts = [
-    V(0.5, 1.7, -0.1),
-    V(0.62, 1.56, 0.0),
-    V(0.745, 1.36, 0.08),
-    V(0.84, 1.13, 0.11),
+    V(0.62, 1.74, -0.14),
+    V(0.79, 1.58, -0.02),
+    V(0.89, 1.36, 0.07),
+    V(0.93, 1.13, 0.11),
     disc(52, 0.6, 0.0),
     disc(18, 0.56, 0.02),
     disc(-24, 0.52, 0.05),

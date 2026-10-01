@@ -34,8 +34,8 @@ export const JOINTS = {
   browR:  { parent: 'head',  space: 'head', pos: [-0.33, 1.08, 0.66] },
   cheekL: { parent: 'head',  space: 'head', pos: [0.54, 0.39, 0.51] },
   cheekR: { parent: 'head',  space: 'head', pos: [-0.54, 0.39, 0.51] },
-  finL:   { parent: 'head',  space: 'head', pos: [0.66, 1.42, 0.12] },
-  finR:   { parent: 'head',  space: 'head', pos: [-0.66, 1.42, 0.12] },
+  finL:   { parent: 'head',  space: 'head', pos: [0.79, 1.42, 0.12] },
+  finR:   { parent: 'head',  space: 'head', pos: [-0.79, 1.42, 0.12] },
   lipUpper: { parent: 'head', space: 'head', pos: [0, 0.2, 0.66] },
   lipLower: { parent: 'jaw',  space: 'head', pos: [0, 0.12, 0.64] },
 };
@@ -61,8 +61,8 @@ export const LANDMARKS = {
   cheekDiscRadius: 0.27,
   cheekDiscNormalL: [0.76, -0.12, 0.64], // outward facing direction of the disc
   jawHinge:     JOINTS.jaw.pos,
-  templeL:      [0.72, 1.3, 0.2],
-  templeR:      [-0.72, 1.3, 0.2],
+  templeL:      [0.82, 1.3, 0.2],
+  templeR:      [-0.82, 1.3, 0.2],
   // Side blades ("fins"): control points for the LEFT blade, HEAD space.
   // Mirror X for the right blade.
   finCurveL: [
@@ -96,14 +96,14 @@ export const HEAD_PROFILE = [
   { y: -0.15, w: 0.34, zf: 0.26, zb: 0.34, n: 2.4, zc: 0.37 },
   { y: 0.1,   w: 0.52, zf: 0.4,  zb: 0.55, n: 2.6, zc: 0.28 },
   { y: 0.4,   w: 0.66, zf: 0.52, zb: 0.74, n: 2.8, zc: 0.18 },
-  { y: 0.75,  w: 0.71, zf: 0.62, zb: 0.86, n: 2.8, zc: 0.1 },
-  { y: 1.05,  w: 0.73, zf: 0.68, zb: 0.95, n: 2.6, zc: 0.06 },
-  { y: 1.33,  w: 0.66, zf: 0.64, zb: 0.97, n: 2.4, zc: 0.02 },
-  { y: 1.55,  w: 0.53, zf: 0.54, zb: 0.9,  n: 2.2, zc: -0.02 },
-  { y: 1.72,  w: 0.41, zf: 0.43, zb: 0.76, n: 2.1, zc: -0.05 },
-  { y: 1.86,  w: 0.27, zf: 0.29, zb: 0.55, n: 2.0, zc: -0.08 },
-  { y: 1.96,  w: 0.13, zf: 0.14, zb: 0.28, n: 2.0, zc: -0.1 },
-  { y: 2.0,   w: 0.0,  zf: 0.0,  zb: 0.0,  n: 2.0, zc: -0.1 },
+  { y: 0.75,  w: 0.73, zf: 0.62, zb: 0.9,  n: 2.6, zc: 0.1 },
+  { y: 1.05,  w: 0.79, zf: 0.68, zb: 1.0,  n: 2.4, zc: 0.05 },
+  { y: 1.33,  w: 0.8,  zf: 0.65, zb: 1.04, n: 2.3, zc: 0.0 },
+  { y: 1.55,  w: 0.74, zf: 0.57, zb: 0.98, n: 2.2, zc: -0.04 },
+  { y: 1.72,  w: 0.62, zf: 0.46, zb: 0.84, n: 2.1, zc: -0.07 },
+  { y: 1.86,  w: 0.45, zf: 0.32, zb: 0.62, n: 2.0, zc: -0.1 },
+  { y: 1.96,  w: 0.24, zf: 0.16, zb: 0.33, n: 2.0, zc: -0.12 },
+  { y: 2.0,   w: 0.0,  zf: 0.0,  zb: 0.0,  n: 2.0, zc: -0.12 },
 ];
 
 const HEAD_Y_MIN = HEAD_PROFILE[0].y;
