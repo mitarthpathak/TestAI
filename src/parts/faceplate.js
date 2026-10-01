@@ -29,8 +29,8 @@ export const meta = {
 // eye-local units (o = outward from the nose, v = up), measured from the face
 // close-up: outer corner raised, inner corner drawn down toward the nose.
 export const SOCKET_PTS = [
-  [0.158, 0.05], [0.09, 0.077], [0.0, 0.083], [-0.1, 0.068], [-0.172, 0.034],
-  [-0.2, -0.055], [-0.172, -0.112], [-0.085, -0.118], [0.015, -0.07], [0.105, -0.008],
+  [0.165, 0.045], [0.1, 0.076], [0.02, 0.072], [-0.08, 0.047], [-0.16, 0.012],
+  [-0.205, -0.05], [-0.175, -0.112], [-0.085, -0.122], [0.02, -0.08], [0.11, -0.015],
 ];
 export const SOCKET_SCALE = 1.0;
 let _lut = null;
@@ -109,11 +109,16 @@ export function build(ctx) {
   const steelB = M.get('chrome', { color: 0xbac0c7, roughness: 0.25, panel: 5.5, seed: 9, lineWidth: 0.0026, lineDepth: 0.7 });
   const steelC = M.get('chrome', { color: 0xb0b6bd, roughness: 0.33, panel: 9, seed: 31, lineWidth: 0.0024, lineDepth: 0.65 });
   const steelD = M.get('chrome', { color: 0xa4aab2, roughness: 0.36, panel: 11, seed: 37, lineWidth: 0.0022, lineDepth: 0.65 });
-  const frameMat = M.get('gunmetal', { color: 0x868c94, roughness: 0.3, side: THREE.DoubleSide });
+  const frameMat = M.get('gunmetal', { color: 0x5a6068, roughness: 0.36, side: THREE.DoubleSide, edge: 2.4 });
   // the mid-face (shield + inner cheek layer) reads darker than the bright V bands
-  const midA = M.get('gunmetal', { color: 0x80868e, roughness: 0.42, panel: 7, seed: 55, lineWidth: 0.0026, lineDepth: 0.75 });
-  const midB = M.get('gunmetal', { color: 0x737981, roughness: 0.45, panel: 9, seed: 57, lineWidth: 0.0024, lineDepth: 0.75 });
+  // large flat plates: darker, rougher gunmetal; `edge` brightens the polished bevels
+  const midA = M.get('gunmetal', { color: 0x5e646c, roughness: 0.5, panel: 7, seed: 55, lineWidth: 0.0026, lineDepth: 0.75, edge: 2.6 });
+  const midB = M.get('gunmetal', { color: 0x555b63, roughness: 0.52, panel: 9, seed: 57, lineWidth: 0.0024, lineDepth: 0.75, edge: 2.6 });
+  const midC = M.get('gunmetal', { color: 0x686e76, roughness: 0.46, panel: 8, seed: 59, lineWidth: 0.0024, lineDepth: 0.75, edge: 2.4 });
   const gun = M.get('gunmetal', { color: 0x8c929a, panel: 8, seed: 13, lineWidth: 0.0028, lineDepth: 0.8 });
+  const keelMat = M.get('gunmetal', { color: 0x80868e, roughness: 0.36, panel: 6, seed: 65, lineWidth: 0.0026, lineDepth: 0.75, edge: 2.6 });
+  const browMat = M.get('gunmetal', { color: 0x7a8088, roughness: 0.34, panel: 6, seed: 61, lineWidth: 0.0026, lineDepth: 0.75, edge: 2.4 });
+  const browMatB = M.get('gunmetal', { color: 0x868c94, roughness: 0.32, panel: 7, seed: 63, lineWidth: 0.0026, lineDepth: 0.75, edge: 2.2 });
   const under = M.get('darkMetal', { panel: 10, seed: 21, lineWidth: 0.0025, side: THREE.DoubleSide });
 
   // rails: [x, y] front-view points converted to chart (u, y)
@@ -195,7 +200,7 @@ export function build(ctx) {
         return base(s, t, P, N) + 0.009 - 0.006 * sm(e, 0.85, 1.0) - 0.003 * groove - 0.008 * cut;
       },
     });
-    inner.add(ctx.mesh(kg, steelB, 'faceplate.nose.keel'));
+    inner.add(ctx.mesh(kg, keelMat, 'faceplate.nose.keel'));
 
     // bridge plate between the eyes: slim raised trapezoid with two cross steps
     const br = [[0.072, 1.06], [0.068, 1.0], [0.063, 0.94], [0.058, 0.9]];
@@ -207,7 +212,7 @@ export function build(ctx) {
         return base(s, t, P, N) + 0.003 + steps - 0.003 * sm(Math.abs(2 * s - 1), 0.85, 1.0);
       },
     });
-    inner.add(ctx.mesh(bg, steelB, 'faceplate.nose.bridge'));
+    inner.add(ctx.mesh(bg, midC, 'faceplate.nose.bridge'));
 
     // narrower lower step and the small tab just above the mouth slit
     const low = [[0.08, 0.56], [0.074, 0.5], [0.066, 0.45], [0.058, 0.41]];
@@ -236,7 +241,7 @@ export function build(ctx) {
     {
       const NS = 160;
       const loops = [
-        [1.2, 0.002], [1.15, 0.01], [1.09, 0.013], [1.04, 0.008],
+        [1.12, 0.002], [1.09, 0.008], [1.06, 0.01], [1.03, 0.006],
         [1.01, -0.006], [0.99, -0.026], [0.975, -0.05],
       ].map(([k, dz]) => {
         const pts = [];
@@ -256,24 +261,32 @@ export function build(ctx) {
     // lower edge hoods the socket top and wraps down its outer side
     // sits TIGHT on the socket top (no helmet arch): a low band from the shield
     // top out to the temple whose top edge meets the forehead plates
-    const bLow = rail([[0.14, 0.952], [0.18, 0.973], [0.25, 0.99], [0.335, 0.996], [0.43, 0.988], [0.49, 0.968], [0.52, 0.935], [0.528, 0.9]], side);
-    const bTop = rail([[0.11, 1.072], [0.18, 1.08], [0.26, 1.092], [0.34, 1.106], [0.44, 1.124], [0.53, 1.13], [0.578, 1.08], [0.588, 0.98], [0.575, 0.9]], side);
+    const bLow = rail([[0.14, 0.93], [0.2, 0.953], [0.27, 0.978], [0.35, 0.994], [0.43, 1.004], [0.5, 1.0], [0.545, 0.978], [0.56, 0.95]], side);
+    const bTop = rail([[0.11, 1.072], [0.18, 1.08], [0.26, 1.092], [0.34, 1.106], [0.44, 1.124], [0.53, 1.13], [0.59, 1.09], [0.605, 1.02], [0.6, 0.95]], side);
     // three angular layers, stepping down from the overhang to the forehead
     const layers = [
-      { s0: 0.0, s1: 0.42, h0: 0.074, h1: 0.056, th: 0.16, mat: steelB, name: 'brow' },
-      { s0: 0.42, s1: 0.74, h0: 0.042, h1: 0.034, th: 0.12, mat: steel, name: 'browMid' },
-      { s0: 0.74, s1: 1.0, h0: 0.03, h1: 0.024, th: 0.1, mat: steelC, name: 'browCap' },
+      // heavy angular hood: the lower layer juts well forward of the socket
+      // (deep shadow over the eye in 3/4) with a hard crease along its face
+      { s0: 0.0, s1: 0.46, h0: 0.16, h1: 0.075, th: 0.22, mat: browMat, name: 'brow', crease: 0.4 },
+      { s0: 0.46, s1: 0.76, h0: 0.062, h1: 0.042, th: 0.14, mat: browMatB, name: 'browMid' },
+      { s0: 0.76, s1: 1.0, h0: 0.038, h1: 0.026, th: 0.1, mat: steelC, name: 'browCap' },
     ];
     for (const Ly of layers) {
       const g = ribbonPlate(THREE, geo, {
         chart, railA: mixRail(bLow, bTop, Ly.s0), railB: mixRail(bLow, bTop, Ly.s1),
-        segS: 8, segT: 64, offset: 0, thickness: Ly.th, bevel: 0.006,
+        segS: Ly.crease ? 14 : 8, segT: 64, offset: 0, thickness: Ly.th, bevel: 0.007,
         gapA: Ly.s0 ? 0.003 : 0, gapB: 0.0, gap0: 0.002, gap1: 0.004,
         lift: (s, t) => {
           // thinner toward the temple leg, and at the nose end it tucks under the shield top
-          const fade = 1 - 0.3 * sm(t, 0.5, 1.0);
-          const nose = lerp(0.8, 1, sm(t, 0.0, 0.1));
-          return (Ly.h0 + (Ly.h1 - Ly.h0) * s) * fade * nose;
+          const fade = 1 - 0.38 * sm(t, 0.55, 1.0);
+          const nose = lerp(0.5, 1, sm(t, 0.0, 0.14));
+          let h;
+          if (Ly.crease) {
+            // two flat facets meeting at a crease: steep front face below, sloped top above
+            const c = Ly.crease, hc = Ly.h0 - 0.02;
+            h = s < c ? Ly.h0 + (hc - Ly.h0) * (s / c) : hc + (Ly.h1 - hc) * ((s - c) / (1 - c));
+          } else h = Ly.h0 + (Ly.h1 - Ly.h0) * s;
+          return h * fade * nose;
         },
       });
       browIn.add(ctx.mesh(g, Ly.mat, `faceplate.${Ly.name}.${key}`));
@@ -289,7 +302,7 @@ export function build(ctx) {
     const strips = [
       { s0: 0.0, s1: 0.26, h0: 0.036, h1: 0.033, mat: midB },
       { s0: 0.26, s1: 0.5, h0: 0.031, h1: 0.028, mat: midA },
-      { s0: 0.5, s1: 0.75, h0: 0.027, h1: 0.022, mat: steel },
+      { s0: 0.5, s1: 0.75, h0: 0.027, h1: 0.022, mat: midC },
       { s0: 0.75, s1: 1.0, h0: 0.019, h1: 0.012, mat: steelD },
     ];
     strips.forEach((S, i) => {
@@ -318,7 +331,7 @@ export function build(ctx) {
           segS: 3, segT: 6, offset: 0, thickness: 0.06, bevel: 0.0025, gap: 0,
           lift: (s2) => S.h0 + (S.h1 - S.h0) * (0.22 + 0.56 * s2) + 0.006,
         });
-        cheekG.add(ctx.mesh(tg, i < 2 ? steelD : steelB, `faceplate.cheek${i}.tab${k}.${key}`));
+        cheekG.add(ctx.mesh(tg, i < 2 ? midA : midC, `faceplate.cheek${i}.tab${k}.${key}`));
       });
     });
   }

@@ -50,7 +50,10 @@ const browY = (x) => {
 };
 // Forehead front zone (front view, model left; mirrored): built from explicit
 // angular plates (section 4b) instead of the flowing bands.
-const FORE_POLY = [[0, 0.98], [0.62, 0.98], [0.62, 1.12], [0.585, 1.22], [0.53, 1.32], [0.43, 1.425], [0.3, 1.51], [0.16, 1.56], [0, 1.57]];
+// It reaches up to the top of the dome so the forehead / crown transition
+// faces upward (no horizontal step in front view).
+const FORE_TOP = 1.735;
+const FORE_POLY = [[0, 0.98], [0.62, 0.98], [0.62, 1.12], [0.6, 1.25], [0.56, 1.38], [0.49, 1.5], [0.4, 1.6], [0.29, 1.675], [0.15, 1.725], [0, FORE_TOP]];
 function inFore(P) {
   if (P.z < 0.2) return false;
   const x = Math.abs(P.x), y = P.y, L = FORE_POLY;
@@ -101,6 +104,11 @@ export function build(ctx) {
   const crestMat = M.get('chrome', { roughness: 0.24, panel: 2.2, seed: 3, lineWidth: 0.003, lineDepth: 0.6 });
   const trimMat = M.get('chrome', { roughness: 0.14 });
   const seamGlow = M.get('redAccent', { intensity: 0.9 });
+  // forehead plates: darker gunmetal with bright polished bevels (ILM concept)
+  const seamDim = M.get('redAccent', { intensity: 0.35 });
+  const foreA = M.get('gunmetal', { color: 0x6a7078, roughness: 0.4, panel: 6, seed: 71, lineWidth: 0.003, lineDepth: 0.8, edge: 2.6 });
+  const foreB = M.get('gunmetal', { color: 0x5e646c, roughness: 0.44, panel: 8, seed: 73, lineWidth: 0.003, lineDepth: 0.8, edge: 2.6 });
+  const foreC = M.get('chrome', { color: 0x868c94, roughness: 0.32, panel: 5, seed: 79, lineWidth: 0.003, lineDepth: 0.75, edge: 2.2 });
 
   // ------------------------------------------------------------ charts
   const field = makeHeadField(THREE, anatomy);
@@ -301,10 +309,10 @@ export function build(ctx) {
   // Plates sit lower toward the back of the skull so they add no bulk there.
   // band 1 — forehead lobes: from the brow line over the crown
   band('band1', S0, S1, [30, [150, 146], 240],
-    { mat: chromeA, offset: 0.018, stagger: -0.008, gapA: 0.006, gapB: 0.007, tuck: 0, lift: (s) => crown(0.012)(s) });
+    { mat: chromeA, offset: 0.018, stagger: -0.008, gapA: 0.006, gapB: 0.007, tuck: 0.012, lift: (s) => crown(0.012)(s) });
   // band 2 — parietal sweep from the brow corner back over the skull
   band('band2', S1, S2, [30, [128, 122], 250],
-    { mat: chromeB, offset: 0.008, stagger: -0.006, tuck: 0, gapB: 0.007, lift: (s) => crown(0.012)(s) });
+    { mat: chromeB, offset: 0.008, stagger: -0.006, tuck: 0.008, gapB: 0.007, lift: (s) => crown(0.012)(s) });
   // band 3 — temple: arcs over the ear from the temple to the back of the head
   band('band3', S2, S3, [20, [118, 112], [214, 218], 280],
     { mat: (k) => (k === 1 ? gunA : chromeA), offset: 0.014, stagger: -0.008, gapB: 0.01, lift: (s) => crown(0.01)(s) });
@@ -316,11 +324,13 @@ export function build(ctx) {
     { mat: (k) => (k % 2 ? chromeB : gunB), offset: 0.006, stagger: 0.006, gapB: 0.008, segS: 8, lift: (s) => crown(0.007)(s) });
 
   // ------------------------------------------------------------ 4b. forehead front plates
-  // Face close-up / ILM concept: angular layered plates either side of the
-  // crest. A slim inner plate beside the crest, a dark diagonal slot sweeping
-  // from the nose-shield corner up and out, and a broad lobe split by a
-  // diagonal seam into angular sub-plates with small insets. Bottoms tuck
-  // under the brow (faceplate); the bands start above FORE_POLY.
+  // Face close-up / ILM concept: MANY small angular plates either side of the
+  // crest, all the way up to the top of the dome (so there is no horizontal
+  // step against the crown bands in front view): an inner column beside the
+  // crest, a dark diagonal slot sweeping from the nose-shield corner up and
+  // out, then three lobe columns, each cut into angular sub-plates by
+  // slanted seams, with raised slivers. Bottoms tuck under the brow
+  // (faceplate); the bands start above FORE_POLY and tuck under the top row.
   {
     const rail = (pts) => {
       const c = new THREE.SplineCurve(pts.map(([x, y]) => new THREE.Vector2(anatomy.headAngleForX(x, y), y)));
@@ -330,41 +340,67 @@ export function build(ctx) {
     };
     const sub = (r, t0, t1) => (t) => r(t0 + (t1 - t0) * t);
     const mixR = (a, b, k) => (t) => { const p = a(t), q = b(t); return [p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k]; };
-    const crestE = rail([[0.083, 1.035], [0.085, 1.2], [0.09, 1.4], [0.1, 1.56]]);
-    const slotI = rail([[0.15, 1.035], [0.178, 1.16], [0.212, 1.31], [0.232, 1.42], [0.24, 1.52]]);
-    const slotO = rail([[0.182, 1.03], [0.208, 1.15], [0.242, 1.3], [0.262, 1.4], [0.272, 1.49]]);
-    const outer = rail([[0.61, 1.03], [0.6, 1.14], [0.57, 1.235], [0.51, 1.335], [0.405, 1.44]]);
-    const midS = mixR(slotO, outer, 0.42);
-    // plate lift: low at the bottom (under the brow), rising to the panel height
-    const lf = (h) => (s, t) => h * THREE.MathUtils.smoothstep(t, 0.03, 0.2) + 0.006 + 0.004 * Math.sin(Math.PI * s);
+    // crest edge traced from the crest itself so the inner column abuts it
+    const cE = [];
+    for (let d = cr0; d <= cr1; d += 1) {
+      const th = d * DEG;
+      dome.chart(S0(th), th, _P, _N);
+      if (_P.y < 1.03 || _P.z < 0.2) continue;
+      if (_P.y > FORE_TOP + 0.01) break;
+      if (!cE.length || _P.y > cE[cE.length - 1][1] + 0.02) cE.push([Math.abs(_P.x) + 0.003, _P.y]);
+    }
+    if (cE[0][1] > 1.04) cE.unshift([cE[0][0], 1.035]);
+    const crestE = rail(cE);
+    const slotI = rail([[0.15, 1.035], [0.178, 1.16], [0.212, 1.31], [0.236, 1.45], [0.25, 1.58], [0.256, 1.69]]);
+    const slotO = rail([[0.182, 1.03], [0.208, 1.15], [0.242, 1.3], [0.266, 1.44], [0.281, 1.57], [0.288, 1.675]]);
+    const outer = rail([[0.61, 1.03], [0.605, 1.15], [0.585, 1.26], [0.545, 1.38], [0.475, 1.5], [0.385, 1.6], [0.3, 1.665]]);
+    const midS = mixR(slotO, outer, 0.3);
+    const midO = mixR(slotO, outer, 0.64);
     const P = (A, B, o) => ribbonPlate(THREE, geo, {
-      chart: field.chart, railA: A, railB: B, segS: o.segS ?? 8, segT: o.segT ?? 30,
-      offset: 0, thickness: 0.06, bevel: 0.006,
+      chart: field.chart, railA: A, railB: B, segS: o.segS ?? 6, segT: o.segT ?? 14,
+      offset: 0, thickness: 0.06, bevel: o.bevel ?? 0.006,
       gapA: o.gapA ?? 0.006, gapB: o.gapB ?? 0.006, gap0: o.gap0 ?? 0, gap1: o.gap1 ?? 0.006,
       lift: o.lift,
     });
-    const defs = [
-      // [name, railA, railB, opts, material]
-      ['fore.inner0', sub(crestE, 0, 0.5), sub(slotI, 0, 0.5), { lift: lf(0.024), gap1: 0.004 }, chromeB],
-      ['fore.inner1', sub(crestE, 0.5, 1), sub(slotI, 0.5, 1), { lift: (s, t) => 0.03 + 0.003 * Math.sin(Math.PI * s), gap0: 0.004 }, chromeA],
-      ['fore.lobeIn0', sub(slotO, 0, 0.55), sub(midS, 0, 0.55), { lift: lf(0.02), gap1: 0.004 }, chromeA],
-      ['fore.lobeIn1', sub(slotO, 0.55, 1), sub(midS, 0.55, 1), { lift: (s, t) => 0.026 + 0.004 * Math.sin(Math.PI * s), gap0: 0.004 }, chromeB],
-      ['fore.lobeOut0', sub(midS, 0, 0.42), sub(outer, 0, 0.42), { lift: lf(0.026), gap1: 0.004 }, chromeB],
-      ['fore.lobeOut1', sub(midS, 0.42, 1), sub(outer, 0.42, 1), { lift: (s, t) => 0.022 + 0.004 * Math.sin(Math.PI * s), gap0: 0.004 }, gunA],
+    const foreMats = [foreA, foreB, foreC, foreB, foreA];
+    // column = [name, railA, railB, cuts (t on A / t on B), base height]
+    const cols = [
+      ['inner', crestE, slotI, [0, [0.36, 0.24], [0.62, 0.5], [0.84, 0.74], 1], 0.028],
+      ['lobeA', slotO, midS, [0, [0.3, 0.14], [0.56, 0.4], [0.8, 0.64], 1], 0.026],
+      ['lobeB', midS, midO, [0, [0.12, 0.32], [0.4, 0.6], [0.66, 0.84], 1], 0.03],
+      ['lobeC', midO, outer, [0, [0.4, 0.2], [0.72, 0.5], 1], 0.024],
     ];
-    for (const [nm, A, B, o, mat] of defs) addPair(P(A, B, o), mat, `cranium.${nm}`, 'band');
-    // slot floor: dark recessed strip in the diagonal groove
-    addPair(P(slotI, slotO, { gapA: -0.002, gapB: -0.002, gap1: 0.0, lift: () => -0.01, segS: 3 }), gunB, 'cranium.fore.slot', 'band');
-    // small angular insets (raised tabs) on the lobe plates
+    cols.forEach(([nm, A, B, cuts, h], ci) => {
+      for (let k = 0; k < cuts.length - 1; k++) {
+        const [a0, b0] = Array.isArray(cuts[k]) ? cuts[k] : [cuts[k], cuts[k]];
+        const [a1, b1] = Array.isArray(cuts[k + 1]) ? cuts[k + 1] : [cuts[k + 1], cuts[k + 1]];
+        const first = k === 0, last = k === cuts.length - 2;
+        const hk = h + ((k + ci) % 2 ? 0.006 : 0) + 0.002 * ((k * 7 + ci * 3) % 3);
+        const lift = (s, t) => {
+          let v = hk + 0.003 * Math.sin(Math.PI * s);
+          if (first) v = v * THREE.MathUtils.smoothstep(t, 0.03, 0.3) + 0.006;
+          // top row: blends down to the crown band level at the top of the dome
+          if (last) v = THREE.MathUtils.lerp(v, 0.024, THREE.MathUtils.smoothstep(t, 0.4, 1.0));
+          return v;
+        };
+        const g = P(sub(A, a0, a1), sub(B, b0, b1), { lift, gap0: first ? 0 : 0.0045, gap1: last ? 0.0 : 0.0045 });
+        addPair(g, foreMats[(k + ci * 2) % foreMats.length], `cranium.fore.${nm}${k}`, 'band');
+      }
+    });
+    // slot floor: dark recessed strip in the diagonal groove, faint red seam inside
+    addPair(P(slotI, slotO, { gapA: -0.002, gapB: -0.002, gap1: 0.0, lift: () => -0.01, segS: 3, segT: 30 }), gunB, 'cranium.fore.slot', 'band');
+    addPair(P(mixR(slotI, slotO, 0.42), mixR(slotI, slotO, 0.58), { gapA: 0, gapB: 0, gap1: 0.02, gap0: 0.03, lift: () => -0.006, segS: 2, segT: 24, bevel: 0.001 }), seamDim, 'cranium.fore.slotGlow', 'band');
     // slim slanted slivers along the plate flow (angular seams, not windows)
     const insets = [
-      [sub(mixR(slotO, midS, 0.3), 0.16, 0.48), sub(mixR(slotO, midS, 0.42), 0.2, 0.52), 0.03],
-      [sub(mixR(midS, outer, 0.22), 0.08, 0.36), sub(mixR(midS, outer, 0.34), 0.12, 0.4), 0.036],
-      [sub(mixR(midS, outer, 0.56), 0.5, 0.84), sub(mixR(midS, outer, 0.68), 0.46, 0.8), 0.032],
-      [sub(mixR(crestE, slotI, 0.4), 0.6, 0.92), sub(mixR(crestE, slotI, 0.62), 0.64, 0.92), 0.04],
-      [sub(mixR(slotO, midS, 0.62), 0.62, 0.9), sub(mixR(slotO, midS, 0.74), 0.66, 0.94), 0.034],
+      [sub(mixR(slotO, midS, 0.25), 0.08, 0.2), sub(mixR(slotO, midS, 0.5), 0.06, 0.16), 0.04],
+      [sub(mixR(midS, midO, 0.2), 0.3, 0.42), sub(mixR(midS, midO, 0.36), 0.34, 0.47), 0.044],
+      [sub(mixR(midO, outer, 0.3), 0.36, 0.56), sub(mixR(midO, outer, 0.46), 0.3, 0.5), 0.04],
+      [sub(mixR(crestE, slotI, 0.35), 0.62, 0.76), sub(mixR(crestE, slotI, 0.6), 0.64, 0.75), 0.044],
+      [sub(mixR(slotO, midS, 0.55), 0.5, 0.66), sub(mixR(slotO, midS, 0.72), 0.46, 0.62), 0.042],
+      [sub(mixR(midS, midO, 0.55), 0.58, 0.68), sub(mixR(midS, midO, 0.8), 0.6, 0.7), 0.046],
+      [sub(mixR(midO, outer, 0.55), 0.08, 0.18), sub(mixR(midO, outer, 0.8), 0.1, 0.2), 0.036],
     ];
-    insets.forEach(([A, B, h], i) => addPair(P(A, B, { gapA: 0, gapB: 0, gap1: 0, lift: () => h, segS: 3, segT: 10 }), trimMat, `cranium.fore.inset${i}`, 'band'));
+    insets.forEach(([A, B, h], i) => addPair(P(A, B, { gapA: 0, gapB: 0, gap1: 0, lift: () => h, segS: 3, segT: 6, bevel: 0.003 }), trimMat, `cranium.fore.inset${i}`, 'band'));
   }
 
   // ------------------------------------------------------------ 5. jaw-hinge caps (chart pole)
