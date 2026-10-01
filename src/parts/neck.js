@@ -295,8 +295,9 @@ export function build(ctx) {
 
   // ----------------------------------------------------------------- pillars
   const PIL = { x: 0.39, z: 0.05, w: 0.12, d: 0.155, r: 0.05 };
+  // two long vertical plates per side (not stacked blocks)
   const pillarSegs = [
-    [0.03, 0.29], [0.315, 0.575], [0.6, 0.86], [0.885, 1.145], [1.17, 1.5],
+    [-0.02, 0.76], [0.79, 1.5],
   ];
   const pillars = { L: [], R: [] };
   for (const side of [1, -1]) {
@@ -318,16 +319,21 @@ export function build(ctx) {
       const d = PIL.d * (top ? 0.88 : 1);
       const seg = puck(THREE, geo, rrLoop(w, d, PIL.r, 6, 3), segProfile(y0 - yc, y1 - yc, 0.016), 0, 0);
       sg.add(ctx.mesh(seg, pillarAlt, `neck.pillar.${key}.${i}.plate`));
-      // stepped armour: a front plate split in two + an outer side plate
+      // long vertical armour: two front strips separated by a groove, an
+      // outer side strip and a thin bright band near the top of the segment
       const hh = (y1 - y0) / 2;
-      const split = -hh + (y1 - y0) * (i % 2 ? 0.42 : 0.58);
       const fw = w * 0.78;
-      const upper = puck(THREE, geo, rrLoop(fw, 0.022, 0.014, 3, 2), segProfile(split + 0.008, hh - 0.018, 0.007), 0.008 * side, d - 0.012);
-      const lower = puck(THREE, geo, rrLoop(fw, 0.022, 0.014, 3, 2), segProfile(-hh + 0.018, split - 0.008, 0.007), 0.008 * side, d - 0.012);
-      sg.add(ctx.mesh(upper, pillarMat, `neck.pillar.${key}.${i}.panel.0`));
-      sg.add(ctx.mesh(lower, i % 2 ? pillarMat : columnMat, `neck.pillar.${key}.${i}.panel.1`));
+      const sw = fw / 2 - 0.012;
+      for (let k = 0; k < 2; k++) {
+        const ox = (k ? 1 : -1) * (fw / 2) + 0.008 * side;
+        const top = hh - 0.02 - (k === (side > 0 ? 1 : 0) ? 0.05 : 0);
+        const strip = puck(THREE, geo, rrLoop(sw, 0.022, 0.012, 3, 2), segProfile(-hh + 0.022, top, 0.008), ox, d - 0.012);
+        sg.add(ctx.mesh(strip, k ? pillarMat : columnMat, `neck.pillar.${key}.${i}.panel.${k}`));
+      }
       const sidePlate = puck(THREE, geo, rrLoop(0.022, d * 0.72, 0.012, 3, 2), segProfile(-hh + 0.03, hh - 0.03, 0.007), (w - 0.012) * side, -0.012);
       sg.add(ctx.mesh(sidePlate, pillarMat, `neck.pillar.${key}.${i}.side`));
+      const bandG = puck(THREE, geo, rrLoop(w + 0.008, d + 0.008, PIL.r, 6, 3), segProfile(hh - 0.11, hh - 0.08, 0.006), 0, 0);
+      sg.add(ctx.mesh(bandG, bright, `neck.pillar.${key}.${i}.band`));
       // washer ring in the gap below the segment
       if (i > 0) {
         const wsh = puck(THREE, geo, rrLoop(w * 0.84, d * 0.84, PIL.r * 0.8, 4, 2), segProfile(y0 - yc - 0.02, y0 - yc - 0.007, 0.004), 0, 0);
