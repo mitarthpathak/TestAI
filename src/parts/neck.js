@@ -428,6 +428,103 @@ export function build(ctx) {
     chestRoot.add(ctx.mesh(base, coreMat, 'neck.base'));
   }
 
+  // ------------------------------------------------------------------- bulk
+  // Muscular neck: widen everything radially about the neck axis, most at the
+  // base where it flares into the trapezius, a little less under the jaw.
+  // Applied to the finished geometry (BODY space), so every plate above keeps
+  // its layout. Pistons are re-aimed live, so their anchors move instead.
+  const AXZ = -0.05;
+  const bulk = (y) => {
+    const t = THREE.MathUtils.smoothstep(y, 0.05, 1.45);
+    return { sx: THREE.MathUtils.lerp(1.62, 1.3, t), sz: THREE.MathUtils.lerp(1.34, 1.16, t) };
+  };
+  const bulkPoint = (v) => {
+    const { sx, sz } = bulk(v.y);
+    return v.set(v.x * sx, v.y, AXZ + (v.z - AXZ) * sz);
+  };
+  {
+    const isPiston = (o) => { for (let q = o; q; q = q.parent) if (q.name && q.name.startsWith('neck.piston')) return true; return false; };
+    const P = new THREE.Vector3(), N = new THREE.Vector3(), Q = new THREE.Vector3();
+    const done = new Set();
+    for (const space of [root, chestRoot]) {
+      space.updateWorldMatrix(true, true);
+      const inv = space.matrixWorld.clone().invert();
+      space.traverse((o) => {
+        if (!o.isMesh || done.has(o.geometry) || isPiston(o)) return;
+        done.add(o.geometry);
+        const toS = inv.clone().multiply(o.matrixWorld);
+        const fromS = toS.clone().invert();
+        const nIn = new THREE.Matrix3().getNormalMatrix(toS);
+        const nOut = new THREE.Matrix3().getNormalMatrix(fromS);
+        const pos = o.geometry.attributes.position;
+        const nrm = o.geometry.attributes.normal;
+        for (let i = 0; i < pos.count; i++) {
+          P.fromBufferAttribute(pos, i).applyMatrix4(toS);
+          if (nrm) {
+            const { sx, sz } = bulk(P.y);
+            N.fromBufferAttribute(nrm, i).applyMatrix3(nIn);
+            N.set(N.x / sx, N.y, N.z / sz).applyMatrix3(nOut).normalize();
+            nrm.setXYZ(i, N.x, N.y, N.z);
+          }
+          bulkPoint(P).applyMatrix4(fromS);
+          pos.setXYZ(i, P.x, P.y, P.z);
+        }
+        pos.needsUpdate = true;
+        if (nrm) nrm.needsUpdate = true;
+        o.geometry.computeBoundingSphere();
+      });
+    }
+    for (const ps of pistons) {
+      bulkPoint(ps.bottom);
+      bulkPoint(Q.copy(ps.topAnchor.position));
+      ps.topAnchor.position.copy(Q);
+    }
+  }
+
+  // ----------------------------------------------------- muscle bundles (SCM)
+  // Thick armoured "sternocleidomastoid" bands: from behind the jaw hinge,
+  // diagonally down and forward to the sternal notch, three strands each,
+  // thickest in the middle (muscle belly). Authored in the bulked space.
+  const muscleMat = M.get('gunmetal', { panel: 5.5, seed: 99, lineWidth: 0.004, angle: 1.4 });
+  const muscleTop = M.get('chrome', { roughness: 0.22, panel: 6, seed: 101, lineWidth: 0.0035, angle: 1.4 });
+  const muscles = [];
+  for (const side of [1, -1]) {
+    const key = side > 0 ? 'L' : 'R';
+    const grp = new THREE.Group();
+    grp.name = `neck.muscle.${key}`;
+    root.add(grp);
+    const strands = [
+      // [offset across (toward outside), offset out, half width, half thickness, material]
+      [0.0, 0.0, 0.085, 0.06, muscleTop],
+      [0.11, -0.03, 0.07, 0.05, muscleMat],
+      [-0.1, -0.04, 0.055, 0.045, muscleMat],
+    ];
+    strands.forEach(([dx, dn, hw, ht, mat], k) => {
+      const pts = [
+        [0.54 * side + dx * side * 0.6, 1.52, -0.08 + dn],
+        [0.56 * side + dx * side, 1.12, 0.1 + dn],
+        [0.44 * side + dx * side * 0.8, 0.66, 0.3 + dn],
+        [0.24 * side + dx * side * 0.5, 0.3, 0.44 + dn],
+        [0.1 * side + dx * side * 0.3, 0.12, 0.5 + dn],
+      ].map((q) => new THREE.Vector3(...q));
+      const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+      const g = geo.sweptSection(curve, geo.roundedSection(hw, ht, 3.2, 26), {
+        steps: 64,
+        // flat side faces outward from the neck axis
+        up: (t) => {
+          const q = curve.getPointAt(t);
+          return new THREE.Vector3(q.x, 0, q.z - AXZ).normalize();
+        },
+        scale: (t) => {
+          const belly = 0.55 + 0.6 * Math.sin(Math.PI * Math.min(1, t * 1.15));
+          return [belly, 0.7 + 0.45 * Math.sin(Math.PI * t)];
+        },
+      });
+      grp.add(ctx.mesh(g, mat, `neck.muscle.${key}.${k}`));
+    });
+    muscles.push(grp);
+  }
+
   // ------------------------------------------------------------------- params
   const params = { breathe: 0, pistons: 0.3, tension: 0, idle: 1 };
   const A = new THREE.Vector3();
@@ -472,6 +569,11 @@ export function build(ctx) {
         sg.position.x -= side * t * 0.018;
         sg.position.y = sg.userData.base.y * (1 - t * 0.04);
       });
+    }
+    // muscles flex with tension / breathing
+    for (const m of muscles) {
+      const k = 1 + t * 0.08 + b * 0.015;
+      m.scale.set(k, 1, k);
     }
     aimPistons(p);
   };
