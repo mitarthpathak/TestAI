@@ -51,7 +51,7 @@ export function createStudioEnvironment(renderer) {
   // broad cool fill panel front-right: readable mid-tones on the shadow side
   box(16, 8, 0x8fa3b8, 0.42, [9, 2, 9]);
   // big dim panel front-left / front: general chrome mid-tones
-  box(18, 10, 0xaab6c4, 0.3, [-6, 2, 12]);
+  box(18, 10, 0xaab6c4, 0.6, [-6, 2, 12]);
   // warm city bokeh: small orange discs low behind and to the sides
   box(0.9, 0, 0xffa060, 3.0, [-8, -0.5, -6], [0, 1.5, 0], true);
   box(0.7, 0, 0xffb070, 2.6, [7, -1.5, -8], [0, 1.5, 0], true);
@@ -145,7 +145,7 @@ export function createLights() {
   const rimR = new THREE.DirectionalLight(0xc4d6ea, 1.7);
   rimR.position.set(5.5, 3, -6);
   // cool fill from the right so the shadow side stays readable steel, not black
-  const fill = new THREE.DirectionalLight(0x9fb2c8, 0.55);
+  const fill = new THREE.DirectionalLight(0x9fb2c8, 0.85);
   fill.position.set(4, 1, 6);
   // red bounce from the eyes onto cheeks / nose
   // (two off-axis lights: a single one on the centre line mirrors as a red
