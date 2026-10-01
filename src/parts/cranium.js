@@ -36,6 +36,9 @@ export function build(ctx) {
   const gunA = M.get('gunmetal', { panel: 3.0, seed: 23, lineWidth: 0.0035, lineDepth: 0.8 });
   const crestMat = M.get('chrome', { roughness: 0.3, panel: 1.6, seed: 3, lineWidth: 0.003, lineDepth: 0.6 });
   const trimMat = M.get('chrome', { roughness: 0.12 });
+  const gunB = M.get('gunmetal', { panel: 5.0, seed: 29, lineWidth: 0.003, lineDepth: 0.85, roughness: 0.3 });
+  // below the bloom threshold: reads as thin glowing seam light, not a bloom source
+  const seamGlow = M.get('redAccent', { intensity: 1.9 });
 
   // ------------------------------------------------------------ charts
   const field = makeHeadField(THREE, anatomy);
@@ -138,7 +141,7 @@ export function build(ctx) {
         chart: dome.chart, railA: A, railB: B,
         segS: o.segS ?? 8,
         segT: Math.max(8, Math.round(lenDeg * 0.45)),
-        offset: off, thickness: 0.05, bevel: o.bevel ?? 0.011,
+        offset: off, thickness: 0.06, bevel: o.bevel ?? 0.006,
         gapA: o.gapA ?? 0.007, gapB: o.gapB ?? 0.007,
         gap0: k === 0 ? o.gapFront ?? 0.006 : o.gapCut ?? 0.006,
         gap1: k === cuts.length - 2 ? o.gapBack ?? 0.006 : o.gapCut ?? 0.006,
@@ -146,8 +149,15 @@ export function build(ctx) {
       });
       const mat = typeof o.mat === 'function' ? o.mat(k) : o.mat;
       const pair = addPair(g, mat, `cranium.${id}.${k}`, 'band');
-      const ins = o.inset ? o.inset(k) : null;
-      if (ins) {
+      if (o.rivets && rnd(k, o.rivets) < 0.75) {
+        // pair of small bosses near the leading cut (rivet / notch detail)
+        const rg = rivetStrip(THREE, geo, dome.chart, A, B, off + lift(0.5, 0.06, k), rnd(k, o.rivets + 9) < 0.5 ? [0.3, 0.7] : [0.25, 0.5, 0.75]);
+        pair.l.add(ctx.mesh(rg, trimMat, `cranium.${id}.${k}.rivets.L`));
+        pair.r.add(ctx.mesh(geo.mirrorGeometryX(rg), trimMat, `cranium.${id}.${k}.rivets.R`));
+      }
+      const insList = o.inset ? [].concat(o.inset(k) && Array.isArray(o.inset(k)[0]) ? o.inset(k) : [o.inset(k)]) : [];
+      for (const ins of insList) {
+        if (!ins) continue;
         const [s0, s1, t0, t1] = ins;
         const mix = (p, q, s) => [p[0] + (q[0] - p[0]) * s, p[1] + (q[1] - p[1]) * s];
         const sub = ribbonPlate(THREE, geo, {
@@ -155,10 +165,10 @@ export function build(ctx) {
           railA: (t) => { const tt = t0 + (t1 - t0) * t; return mix(A(tt), B(tt), s0); },
           railB: (t) => { const tt = t0 + (t1 - t0) * t; return mix(A(tt), B(tt), s1); },
           segS: 4, segT: Math.max(6, Math.round(lenDeg * 0.3 * (t1 - t0))),
-          offset: off, thickness: 0.03, bevel: 0.006, gap: 0.0, gap0: 0.0, gap1: 0.0,
-          lift: (s, t) => lift(s0 + (s1 - s0) * s, t0 + (t1 - t0) * t, k) + 0.006,
+          offset: off, thickness: 0.03, bevel: 0.004, gap: 0.0, gap0: 0.0, gap1: 0.0,
+          lift: (s, t) => lift(s0 + (s1 - s0) * s, t0 + (t1 - t0) * t, k) + 0.009,
         });
-        const subMat = mat === gunA ? chromeB : gunA;
+        const subMat = mat === gunA || mat === gunB ? chromeB : (rnd(k, s0 * 7) < 0.5 ? gunB : gunA);
         const l = ctx.mesh(sub, subMat, `cranium.${id}.${k}.inset.L`);
         const r = ctx.mesh(geo.mirrorGeometryX(sub), subMat, `cranium.${id}.${k}.inset.R`);
         pair.l.add(l); pair.r.add(r);
@@ -172,6 +182,10 @@ export function build(ctx) {
   // insets are long strips that follow the band flow (or short end tabs)
   const insetEvery = (salt, prob = 0.6) => (k) => {
     if (rnd(k, salt) > prob) return null;
+    if (rnd(k, salt + 11) < 0.35) {
+      // two short tabs, front and back (stepped panel pair)
+      return [[0.2, 0.62, 0.08, 0.38], [0.38, 0.8, 0.55, 0.9]];
+    }
     const r = rnd(k, salt + 1);
     if (r < 0.6) {
       const a = 0.24 + 0.14 * rnd(k, salt + 2);
@@ -184,24 +198,50 @@ export function build(ctx) {
   // band 1 — forehead lobes: from under the brow, tapering into the crown, down the back
   band('band1', S0, S1,
     [[44, 44], [84, 78], [122, 128], [160, 164], [190, 194], [216, 214]],
-    { mat: (k) => (k % 2 ? chromeB : chromeA), offset: 0.012, stagger: 0.008, gapA: 0.02, gapB: 0.008, lift: (s) => crown(0.014)(s),
-      inset: (k) => (k === 2 || k === 4 ? [0.3, 0.8, 0.15, 0.7] : null) });
+    { mat: (k) => (k === 1 ? gunB : k % 2 ? chromeB : chromeA), offset: 0.022, stagger: 0.01, gapA: 0.02, gapB: 0.009, lift: (s) => crown(0.012)(s), rivets: 41,
+      inset: (k) => (k === 0 ? [[0.42, 0.82, 0.3, 0.62], [0.3, 0.7, 0.7, 0.92]] : k === 1 ? [[0.3, 0.75, 0.1, 0.4], [0.3, 0.75, 0.55, 0.88]] : k === 2 || k === 4 ? [0.3, 0.8, 0.15, 0.7] : k === 3 ? [0.25, 0.7, 0.2, 0.8] : null) });
   // band 2 — long sweep from the brow corner back over the skull
   band('band2', S1, S2,
     [[42, 50], [70, 76], [100, 96], [130, 126], [160, 156], [192, 194], [226, 230]],
-    { mat: (k) => (k % 2 ? gunA : chromeA), offset: 0.002, stagger: 0.009, gapB: 0.008, lift: (s) => crown(0.011)(s), inset: insetEvery(2, 0.5) });
+    { mat: (k) => (k % 2 ? gunA : chromeA), offset: 0.0, stagger: 0.012, gapB: 0.009, lift: (s) => crown(0.011)(s), inset: insetEvery(2, 0.85), rivets: 42 });
   // band 3 — arcs over the ear from the temple to the back of the head
   band('band3', S2, S3,
     [[58, 62], [86, 80], [114, 110], [142, 138], [172, 170], [204, 206], [232, 236], [256, 260]],
-    { mat: (k) => (k % 2 ? chromeB : gunA), offset: 0.008, stagger: -0.006, gapB: 0.009, lift: (s) => crown(0.01)(s), inset: insetEvery(3, 0.55) });
+    { mat: (k) => (k % 2 ? chromeB : k % 4 === 0 ? gunB : gunA), offset: 0.014, stagger: -0.01, gapB: 0.009, lift: (s) => crown(0.01)(s), inset: insetEvery(3, 0.85), rivets: 43 });
   // band 4 — lower arc behind the cheek, shingled over band 3
   band('band4', S3, S3b,
     [[62, 60], [96, 94], [130, 132], [166, 168], [204, 208], [240, 244], [272, 276]],
-    { mat: (k) => (k % 2 ? gunA : chromeA), offset: 0.018, stagger: 0.007, gapA: -0.014, gapB: 0.008, lift: (s) => crown(0.008)(s), inset: insetEvery(4, 0.5) });
+    { mat: (k) => (k % 2 ? gunA : chromeA), offset: 0.03, stagger: 0.01, gapA: -0.014, gapB: 0.008, lift: (s) => crown(0.008)(s), inset: insetEvery(4, 0.8) });
   // band 5 — innermost arc around the jaw hinge
   band('band5', S3b, S4,
     [[40, 40], [90, 86], [140, 140], [196, 200], [250, 254], [300, 300]],
-    { mat: (k) => (k % 2 ? chromeB : gunA), offset: 0.006, stagger: 0.006, gapB: 0.008, segS: 8, lift: (s) => crown(0.007)(s) });
+    { mat: (k) => (k % 2 ? chromeB : gunB), offset: 0.006, stagger: 0.008, gapB: 0.008, segS: 8, lift: (s) => crown(0.007)(s), inset: insetEvery(5, 0.6) });
+
+  // ------------------------------------------------------------ 4b. red glowing seam inlays
+  // a few deliberate lit seams (poster ref): crest flanks over the forehead,
+  // the forehead-lobe seam above the brows, and a short temple seam.
+  {
+    const strip = (phiFn, th0, th1, dPhi, name, steps = 40) => {
+      const P = new THREE.Vector3(), N = new THREE.Vector3();
+      const pts = [], nrm = [];
+      for (let i = 0; i <= 24; i++) {
+        const th = (th0 + (th1 - th0) * (i / 24)) * DEG;
+        const r = rMid(th);
+        dome.chart(phiFn(th) + dPhi / r, th, P, N);
+        pts.push(P.clone().addScaledVector(N, 0.004));
+        nrm.push(N.clone());
+      }
+      const curve = new THREE.CatmullRomCurve3(pts);
+      const g = geo.sweptSection(curve, geo.roundedSection(0.0034, 0.006, 2, 8), {
+        steps, up: (t) => nrm[Math.round(t * 24)], scale: (t) => [1, Math.min(1, t * 10, (1 - t) * 10)],
+      });
+      root.add(ctx.mesh(g, seamGlow, `${name}.L`));
+      root.add(ctx.mesh(geo.mirrorGeometryX(g), seamGlow, `${name}.R`));
+    };
+    strip(S0, 62, 128, 0.01, 'cranium.glow.crest');
+    strip(S1, 46, 96, 0.0, 'cranium.glow.forehead');
+    strip(S2, 46, 92, 0.0, 'cranium.glow.temple');
+  }
 
   // ------------------------------------------------------------ 5. jaw-hinge caps (chart pole)
   {
@@ -408,6 +448,26 @@ function makeDomeChart(THREE, field, C) {
   };
   const chart = (phi, th, P, N) => { point(phi, th, P); normalAt(P, N); };
   return { chart, radius, point };
+}
+
+/** Merged row of small rivet bosses across a band segment near its front cut. */
+function rivetStrip(THREE, geo, chart, A, B, h, ss) {
+  const P = new THREE.Vector3(), N = new THREE.Vector3();
+  const parts = [];
+  for (const s of ss) {
+    const a = A(0.06), b = B(0.06);
+    chart(a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, P, N);
+    const g = geo.ringStack([[0, 0.014], [0.008, 0.014], [0.011, 0.009], [0.012, -0.01]], 12);
+    const o = new THREE.Object3D();
+    o.position.copy(P).addScaledVector(N, h);
+    geo.faceDirection(o, N);
+    o.updateMatrix();
+    g.applyMatrix4(o.matrix);
+    parts.push(g);
+  }
+  const m = geo.mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)), false);
+  m.computeBoundingSphere();
+  return m;
 }
 
 function edgeDense(count, edgeFrac) {

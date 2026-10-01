@@ -35,7 +35,7 @@ export const meta = {
 const FRAME_PITCH = 0.14; // +: frame z tilts down (the mask faces slightly down here)
 const FRAME_YAW = 0.24; // +: frame z turns outward (mask normal at the eye)
 const HINGE_DEPTH = 0.34; // lid hinge / eyeball centre behind the cutout centre
-const LENS_R = 0.06; // radius of the glowing lens disc
+const LENS_R = 0.05; // radius of the glowing lens disc
 const LID_TH = 0.011; // lid plate thickness
 const LID_GAP = 0.02; // upper lid surface behind the mask outer surface
 const BLINK_ANGLE = 0.46;// radians the upper lid travels to close
@@ -315,7 +315,7 @@ export function build(ctx) {
     if (Math.abs(x) < 0.14) RLtop = Math.min(RLtop, r);
     RBall = Math.min(RBall, r);
   }
-  const RL = RLtop - 0.007; // lens glass sphere (bezel rises up to +0.007)
+  const RL = RLtop - 0.024; // lens glass sphere, set deep in the socket (bezel rises up to +0.007)
   RBall = Math.min(RBall - 0.004, RL - 0.004);
 
   // ------------------------------------------------------------ materials
@@ -328,6 +328,8 @@ export function build(ctx) {
   const cavityMat = M.get('cavity', { side: THREE.DoubleSide, color: 0x050506, roughness: 0.85 });
   const ballMat = M.get('cavity', { color: 0x050506, roughness: 0.8 });
   const browMat = M.get('chrome', { roughness: 0.18, panel: 5, seed: 31, lineWidth: 0.004 });
+  // thin lit lid line around the opening (below the bloom threshold)
+  const rimLineMat = M.get('redAccent', { intensity: 2.4 });
 
   // glow materials: registered with the library so M.setGlow() scales them
   const gain = new THREE.Color(1, 1, 1);
@@ -383,6 +385,10 @@ export function build(ctx) {
     return pts;
   };
   const rimGlowGeo = loftLoops(THREE, [lowerArc(1.0, 0.0065), lowerArc(0.976, 0.0048), lowerArc(0.957, 0.0115), lowerArc(0.945, 0.03)], false);
+  const rimLineGeo = (() => {
+    const pts = outline.map((p) => V3(p.x * 0.99, p.y * 0.99, p.z - 0.008));
+    return geo.sweptSection(new THREE.CatmullRomCurve3(pts, true), geo.roundedSection(0.0032, 0.0032, 2, 8), { steps: 144, up: V3(0, 0, 1), caps: false });
+  })();
   const rimGlowMat = registerGlow(new THREE.ShaderMaterial({
     name: 'eyes.rimGlow',
     uniforms: { uGain: { value: gain }, uColor: { value: V3(0.9, -0.12, -0.1) }, uSigma: { value: 0.11 } },
@@ -472,7 +478,7 @@ export function build(ctx) {
     const x = ca * Math.cos(t), y = cb * Math.sin(t);
     const z = depthAlong(qS, x, y);
     const p = V3(x, y, z).applyQuaternion(qS).add(C);
-    const over = 0.012 + 0.01 * (i / 18);
+    const over = 0.02 + 0.014 * (i / 18); // heavier overhang: eyes read deep-set
     top.push([p.x, p.y - over]);
   }
   const outerEnd = top[0];
@@ -500,7 +506,10 @@ export function build(ctx) {
     A.headNormal(ua, y, _n);
     let h = 0.006 + maskLift(ua, y);
     if (front) {
-      h += 0.014 + 0.034 * (1 - t * t * (3 - 2 * t));
+      // heavy wedge: juts hard along the lower (overhanging) edge, with a
+      // crisp secondary step a third of the way up
+      const tt = t * t * (3 - 2 * t);
+      h += 0.012 + 0.064 * (1 - tt) + 0.008 * (1 - THREE.MathUtils.smoothstep(t, 0.3, 0.36));
       const d = Math.min(Math.min(t, 1 - t) * _a3.distanceTo(_b3), Math.min(s, 1 - s) * browLen);
       if (d < BROW_BEVEL) {
         const k = BROW_BEVEL - d;
@@ -535,6 +544,7 @@ export function build(ctx) {
     const rim = ctx.mesh(rimGlowGeo, rimGlowMat, `eyes.rimGlow.${key}`);
     rim.renderOrder = 2;
     frame.add(rim);
+    frame.add(ctx.mesh(rimLineGeo, rimLineMat, `eyes.rimLine.${key}`));
 
     // lids hinge about F's x axis through E
     const upperPivot = new THREE.Group();
