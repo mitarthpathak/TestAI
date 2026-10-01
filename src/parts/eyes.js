@@ -28,10 +28,10 @@ export const meta = {
 // eye-local units (o = outward from the nose, v = up), measured from the face
 // close-up: outer corner raised, inner corner drawn down toward the nose.
 const SOCKET_PTS = [
-  [0.162, 0.053], [0.099, 0.084], [0.0, 0.099], [-0.104, 0.084], [-0.18, 0.04],
-  [-0.218, -0.112], [-0.129, -0.137], [0.0, -0.099], [0.099, -0.061],
+  [0.158, 0.05], [0.09, 0.077], [0.0, 0.083], [-0.1, 0.068], [-0.172, 0.034],
+  [-0.2, -0.055], [-0.172, -0.112], [-0.085, -0.118], [0.015, -0.07], [0.105, -0.008],
 ];
-const SOCKET_SCALE = 0.95;
+const SOCKET_SCALE = 1.0;
 let _lut = null;
 function socketLUT() {
   if (_lut) return _lut;
@@ -73,14 +73,14 @@ function socketPoint(anatomy, side, t, k = 1) {
   return [side * (e[0] + o), e[1] + v];
 }
 
-const LENS_R = 0.068;      // a touch larger than LANDMARKS.eyeRadius (film frames)
+const LENS_R = 0.058;      // small ringed disc, half hidden by the lids (face close-up)
 const LENS_Z = 0.012;      // lens in front of the eye joint (local z)
 const LID_C = -0.075;      // lid hinge axis behind the eye joint (local z)
 const LID_R = 0.118;       // lid shell radius about the hinge
 const LID_TH = 0.009;
 const LOOK_C = -0.07;      // gaze pivot behind the lens
-const UP_REST = 0.47;      // upper lid edge angle at rest (rad, + up)
-const LO_REST = -0.56;     // lower lid edge angle at rest
+const UP_REST = 0.15;      // upper lid edge angle at rest (rad, + up)
+const LO_REST = -0.4;     // lower lid edge angle at rest
 const MEET = -0.06;        // where the lids meet on a blink
 const LOOK_X = 0.2, LOOK_Y = 0.12;
 const LIGHT_I = 0.01;
@@ -108,10 +108,10 @@ void main() {
   // face close-up: pink-red disc with a hot white-pink outer rim, concentric
   // red rings, tick marks and a small white "pupil" ring near the top
   vec3 deep = vec3(0.9, -0.09, -0.075);
-  vec3 red = vec3(4.2, -0.45, -0.3);
-  vec3 pink = vec3(6.0, 0.5, 0.6);
-  vec3 white = vec3(9.0, 3.6, 3.6);
-  vec3 col = mix(red, pink, smoothstep(0.2, 0.8, r));
+  vec3 red = vec3(3.4, -0.4, -0.28);
+  vec3 pink = vec3(4.2, 0.25, 0.32);
+  vec3 white = vec3(13.0, 5.2, 5.0);
+  vec3 col = mix(red, pink, smoothstep(0.45, 0.8, r));
   // concentric darker red rings
   float d = ring(r, 0.3, 0.03, aa) * 0.6;
   d = max(d, ring(r, 0.56, 0.035, aa) * 0.7);
@@ -122,9 +122,9 @@ void main() {
   d = max(d, tick * 0.8);
   col *= 1.0 - d;
   // hot white-pink outer rim
-  col = mix(col, white, ring(r, 0.86, 0.065, aa));
+  col = mix(col, white, ring(r, 0.85, 0.085, aa));
   // small white pupil ring near the top centre
-  vec2 q = (p - vec2(0.0, 0.4)) / max(0.3, uPupil);
+  vec2 q = (p - vec2(0.0, 0.14)) / max(0.3, uPupil);
   float qr = length(q);
   col = mix(col, white, 1.0 - smoothstep(0.17 - aa, 0.17 + aa, qr));
   col = mix(col, red * 0.5, ring(qr, 0.22, 0.035, aa));
@@ -153,9 +153,9 @@ export function build(ctx) {
   const surfZ = (x, y) => A.headFrontZ(x, y) ?? 0.5;
 
   // ------------------------------------------------------------ materials
-  const lidMat = M.get('darkMetal', { panel: 16, seed: 43, lineWidth: 0.002, roughness: 0.32, color: 0x30343a, side: THREE.DoubleSide });
+  const lidMat = M.get('gunmetal', { panel: 16, seed: 43, lineWidth: 0.002, roughness: 0.3, color: 0x5c626a, side: THREE.DoubleSide });
   const leafMat = M.get('gunmetal', { panel: 14, seed: 47, lineWidth: 0.002, roughness: 0.3, side: THREE.DoubleSide });
-  const edgeMat = M.get('darkMetal', { roughness: 0.3, color: 0x34383e });
+  const edgeMat = M.get('gunmetal', { roughness: 0.28, color: 0x6a7078 });
   const ringMat = M.get('darkMetal', { roughness: 0.26, metalness: 1.0 });
   const cavityMat = M.get('cavity', { side: THREE.DoubleSide, color: 0x040405, roughness: 0.85 });
   const rimMat = M.get('gunmetal', { roughness: 0.22 });
@@ -176,7 +176,7 @@ export function build(ctx) {
   }));
   const haloMat = registerGlow(new THREE.ShaderMaterial({
     name: 'eyes.halo',
-    uniforms: { uGain: { value: gain }, uColor: { value: V(0.45, -0.06, -0.05) }, uR0: { value: LENS_R * 1.0 }, uR1: { value: LENS_R * 1.3 } },
+    uniforms: { uGain: { value: gain }, uColor: { value: V(0.22, -0.03, -0.025) }, uR0: { value: LENS_R * 1.0 }, uR1: { value: LENS_R * 1.3 } },
     vertexShader: LENS_VERT,
     fragmentShader: HALO_FRAG,
     transparent: true,
@@ -211,6 +211,9 @@ export function build(ctx) {
   const upperEdgeGeo = rod(UP_REST + 0.03, LID_R - LID_TH * 0.5, 0.0058);
   const lowerEdgeGeo = rod(LO_REST - 0.03, LID_R - 0.004 - LID_TH * 0.5, 0.0052);
   const lowerRibGeo = rod(LO_REST - 0.16, LID_R - 0.002, 0.0032, -W + 0.04, W - 0.04);
+  // layered shutter look: fine horizontal ribs across the upper lid
+  const lowerRibGeos = [-0.2, -0.36].map((d) => rod(LO_REST + d, LID_R - 0.0035, 0.0024, -W + 0.05, W - 0.05));
+  const upperRibGeos = [0.2, 0.36, 0.55].map((d, i) => rod(UP_REST + d, LID_R + 0.0005, 0.0026, -W + 0.03 + i * 0.02, W - 0.03 - i * 0.015));
 
   // ------------------------------------------------------------- assemble
   const sides = {};
@@ -279,6 +282,8 @@ export function build(ctx) {
     lowerPivot.add(ctx.mesh(lowerLidGeo, lidMat, `eyes.lidLower.${key}`));
     lowerPivot.add(ctx.mesh(lowerEdgeGeo, edgeMat, `eyes.lidLowerEdge.${key}`));
     lowerPivot.add(ctx.mesh(lowerRibGeo, ringMat, `eyes.lidLowerRib.${key}`));
+    lowerRibGeos.forEach((g, i) => lowerPivot.add(ctx.mesh(g, ringMat, `eyes.lidLowerRib${i + 1}.${key}`)));
+    upperRibGeos.forEach((g, i) => upperPivot.add(ctx.mesh(g, ringMat, `eyes.lidUpperRib${i}.${key}`)));
 
     const look = new THREE.Group();
     look.name = `eyes.lookPivot.${key}`;
@@ -287,7 +292,7 @@ export function build(ctx) {
     const iris = new THREE.Group();
     iris.name = `eyes.iris.${key}`;
     iris.position.set(0, 0, LENS_Z - LOOK_C);
-    iris.scale.set(1.0, 0.68, 1); // wide, flattened iris (face close-up)
+    iris.scale.set(1.0, 0.94, 1); // round disc; the lids crop it to a slit
     look.add(iris);
     iris.add(ctx.mesh(bezelGeo, ringMat, `eyes.lensBezel.${key}`));
     const lens = ctx.mesh(lensGeo, lensMat, `eyes.lens.${key}`);
