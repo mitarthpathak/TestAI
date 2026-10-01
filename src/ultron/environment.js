@@ -42,9 +42,9 @@ export function createStudioEnvironment(renderer) {
     env.add(m);
   };
   // key softbox: high, front-left (matches the shadow-casting key light)
-  box(7, 4, 0xe8eef5, 2.1, [-5, 8, 7]);
+  box(7, 4, 0xe8eef5, 1.6, [-5, 8, 7]);
   // overhead strip -> bright crest / top-edge highlights on every plate
-  box(9, 0.6, 0xffffff, 2.4, [0, 10, 1]);
+  box(9, 0.6, 0xffffff, 1.5, [0, 10, 1]);
   // cold rim strips behind on both sides
   box(1.4, 12, 0xbcd0e6, 2.2, [-9, 3, -7]);
   box(1.4, 12, 0xbcd0e6, 1.9, [9, 3, -7]);
@@ -147,16 +147,20 @@ export function createLights() {
   // cool fill from the right so the shadow side stays readable steel, not black
   const fill = new THREE.DirectionalLight(0x9fb2c8, 0.85);
   fill.position.set(4, 1, 6);
+  // low front under-fill: lifts the downward-facing muzzle / jaw plates
+  const underFill = new THREE.DirectionalLight(0xb8c4d2, 0.7);
+  underFill.position.set(-1, -3, 6);
+  underFill.target.position.set(0, 1.9, 0);
   // red bounce from the eyes onto cheeks / nose
   // (two off-axis lights: a single one on the centre line mirrors as a red
   // stripe down the flat nose board)
-  const eyeBounce = new THREE.PointLight(0xff2010, 0.12, 1.0, 2);
+  const eyeBounce = new THREE.PointLight(0xff2010, 0.06, 1.0, 2);
   eyeBounce.position.set(0.3, 2.25, 0.98); // just in front of each eye (world)
   eyeBounce.name = 'eyeBounce';
-  const eyeBounceR = new THREE.PointLight(0xff2010, 0.12, 1.0, 2);
+  const eyeBounceR = new THREE.PointLight(0xff2010, 0.06, 1.0, 2);
   eyeBounceR.position.set(-0.3, 2.25, 0.98);
   eyeBounceR.name = 'eyeBounceR';
-  g.add(key, key.target, rimL, rimR, fill, eyeBounce, eyeBounceR);
-  g.userData = { key, rimL, rimR, fill, eyeBounce, eyeBounceR };
+  g.add(key, key.target, rimL, rimR, fill, underFill, underFill.target, eyeBounce, eyeBounceR);
+  g.userData = { key, rimL, rimR, fill, underFill, eyeBounce, eyeBounceR };
   return g;
 }

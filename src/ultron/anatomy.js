@@ -54,7 +54,7 @@ export const JOINTS = {
 export const LANDMARKS = {
   crownTop:     [0, 1.96, -0.12],
   chinBottom:   [0, -0.32, 0.6],
-  chinButton:   [0, -0.14, 0.76],     // the round "button" on the front of the chin
+  chinButton:   [0, -0.175, 0.7],      // the round "button" on the front of the chin
   mouthCenter:  [0, 0.24, 0.88],      // mouth slit, on the forward muzzle
   mouthHalfWidth: 0.15,
   noseTip:      [0, 0.5, 0.9],        // bottom of the central nose plate (just above the upper lip)
