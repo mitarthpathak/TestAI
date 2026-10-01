@@ -96,10 +96,10 @@ export const HEAD_PROFILE = [
   { y: -0.15, w: 0.34, zf: 0.26, zb: 0.34, n: 2.4, zc: 0.37 },
   { y: 0.1,   w: 0.52, zf: 0.4,  zb: 0.55, n: 2.6, zc: 0.28 },
   { y: 0.4,   w: 0.66, zf: 0.52, zb: 0.74, n: 2.8, zc: 0.18 },
-  { y: 0.75,  w: 0.74, zf: 0.62, zb: 0.86, n: 2.8, zc: 0.1 },
-  { y: 1.05,  w: 0.77, zf: 0.68, zb: 0.95, n: 2.6, zc: 0.06 },
-  { y: 1.33,  w: 0.69, zf: 0.64, zb: 0.97, n: 2.4, zc: 0.02 },
-  { y: 1.55,  w: 0.55, zf: 0.54, zb: 0.9,  n: 2.2, zc: -0.02 },
+  { y: 0.75,  w: 0.71, zf: 0.62, zb: 0.86, n: 2.8, zc: 0.1 },
+  { y: 1.05,  w: 0.73, zf: 0.68, zb: 0.95, n: 2.6, zc: 0.06 },
+  { y: 1.33,  w: 0.66, zf: 0.64, zb: 0.97, n: 2.4, zc: 0.02 },
+  { y: 1.55,  w: 0.53, zf: 0.54, zb: 0.9,  n: 2.2, zc: -0.02 },
   { y: 1.72,  w: 0.41, zf: 0.43, zb: 0.76, n: 2.1, zc: -0.05 },
   { y: 1.86,  w: 0.27, zf: 0.29, zb: 0.55, n: 2.0, zc: -0.08 },
   { y: 1.96,  w: 0.13, zf: 0.14, zb: 0.28, n: 2.0, zc: -0.1 },
@@ -244,6 +244,68 @@ export function insideCutout(point, names = Object.keys(CUTOUTS), pad = 0) {
   return false;
 }
 
+// ---------------------------------------------------------------------------
+// FACE_WARP — global reshaping of the head, applied to every head part right
+// after it is built (see Ultron.loadPart). Parts author on the shell above;
+// the warp then narrows the lower face (taper) and lengthens the jaw/chin
+// (stretch below pivotY) to match the film silhouette (reference/ultron-film-*.png).
+// Joints in `rigid` move as solid bodies (no per-vertex warp) so eyes stay
+// round and the cheek turbines keep spinning about their own centre.
+// ---------------------------------------------------------------------------
+export const FACE_WARP = {
+  enabled: true,
+  pivotY: 0.34,     // no vertical change above this height
+  stretch: 1.55,    // vertical scale of everything well below pivotY
+  blend: 0.22,      // height over which the stretch ramps in
+  // [y, x-scale] keyframes (linear), 1 = unchanged
+  taper: [[0.95, 1.0], [0.7, 0.93], [0.4, 0.84], [0.1, 0.74], [-0.3, 0.62]],
+  muzzle: 0.16,     // push the centre of the lower face forward (+Z), grows toward the chin
+  rigid: ['eyeL', 'eyeR', 'browL', 'browR', 'cheekL', 'cheekR'],
+  skipParts: ['neck', 'collar'], // body parts (their head anchors are re-aimed live)
+};
+
+function warpTaper(y) {
+  const T = FACE_WARP.taper;
+  if (y >= T[0][0]) return T[0][1];
+  for (let i = 1; i < T.length; i++) {
+    if (y >= T[i][0]) {
+      const [y0, g0] = T[i - 1], [y1, g1] = T[i];
+      return g1 + ((g0 - g1) * (y - y1)) / (y0 - y1);
+    }
+  }
+  return T[T.length - 1][1];
+}
+function warpY(y) {
+  const { pivotY, stretch, blend } = FACE_WARP;
+  const d = pivotY - y;
+  if (d <= 0) return { y, dy: 1 };
+  if (d <= blend) return { y: pivotY - (d + ((stretch - 1) * d * d) / (2 * blend)), dy: 1 + ((stretch - 1) * d) / blend };
+  return { y: pivotY - (blend + ((stretch - 1) * blend) / 2 + stretch * (d - blend)), dy: stretch };
+}
+function warpMuzzle(x, y) {
+  // 0 at the eyes, ramps to 1 at the mouth and keeps growing a little to the chin
+  const t = THREE.MathUtils.clamp((0.8 - y) / 0.7, 0, 1.6);
+  const ramp = t * t * (3 - 2 * Math.min(t, 1));
+  return FACE_WARP.muzzle * ramp * Math.exp(-Math.pow(x / 0.42, 2));
+}
+
+/** Warp a HEAD-space point in place. Returns the point. */
+export function warpHeadPoint(p) {
+  if (!FACE_WARP.enabled) return p;
+  const g = warpTaper(p.y);
+  const z = p.z + (p.z > 0 ? warpMuzzle(p.x, p.y) : 0);
+  const { y } = warpY(p.y);
+  return p.set(p.x * g, y, z);
+}
+
+/** Approximate normal transform for warpHeadPoint (in place, normalised). */
+export function warpHeadNormal(p, n) {
+  if (!FACE_WARP.enabled) return n;
+  const g = warpTaper(p.y);
+  const { dy } = warpY(p.y);
+  return n.set(n.x / g, n.y / dy, n.z).normalize();
+}
+
 /** Camera presets used by the page and by the Playwright capture script. */
 export const VIEWS = {
   // azimuth: degrees around Y towards the model's left (+X); elevation: degrees up
@@ -251,5 +313,7 @@ export const VIEWS = {
   threequarter: { azimuth: 36, elevation: 4,  distance: 7.0, target: [0, 1.9, 0] },
   side:         { azimuth: 90, elevation: 0,  distance: 7.2, target: [0, 1.85, 0] },
   closeup:      { azimuth: 12, elevation: 2,  distance: 4.6, target: [0, 2.3, 0.2] },
+  film34:       { azimuth: 42, elevation: -9, distance: 6.4, target: [0, 1.9, 0.1] },
+  filmfront:    { azimuth: 8,  elevation: -6, distance: 6.6, target: [0, 1.85, 0.1] },
   hero:         { azimuth: 0,  elevation: -4, distance: 7.6, target: [0, 1.8, 0] },
 };

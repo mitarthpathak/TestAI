@@ -8,7 +8,7 @@
  * to it and to its children. Rest pose = all joint rotations zero.
  */
 import * as THREE from 'three';
-import { JOINTS } from './anatomy.js';
+import { JOINTS, FACE_WARP, warpHeadPoint } from './anatomy.js';
 
 export class Rig {
   constructor() {
@@ -37,6 +37,35 @@ export class Rig {
     }
     this.root = this.joints.root;
     this.headOrigin = headOrigin;
+    this.warped = false;
+    // body-space joint positions after FACE_WARP (head-space joints only)
+    this.warpedBodyPos = {};
+    for (const [name, j] of Object.entries(JOINTS)) {
+      if (j.space === 'head' && name !== 'head') {
+        this.warpedBodyPos[name] = warpHeadPoint(new THREE.Vector3().fromArray(j.pos)).add(headOrigin);
+      } else {
+        this.warpedBodyPos[name] = this.bodyPos[name].clone();
+      }
+    }
+    this.setWarp(FACE_WARP.enabled);
+  }
+
+  /**
+   * Switch head-space joints between authored (unwarped) and FACE_WARP
+   * positions. Current animation offsets (position - rest) are preserved.
+   */
+  setWarp(on) {
+    const P = on ? this.warpedBodyPos : this.bodyPos;
+    for (const [name, j] of Object.entries(JOINTS)) {
+      if (!j.parent) continue;
+      const g = this.joints[name];
+      const rest = P[name].clone().sub(P[j.parent]);
+      const offset = g.position.clone().sub(g.userData.restPosition);
+      g.userData.restPosition.copy(rest);
+      g.position.copy(rest).add(offset);
+    }
+    this.warped = on;
+    this.root.updateMatrixWorld(true);
   }
 
   /**

@@ -77,7 +77,16 @@ export class Ultron {
     try {
       const mod = await entry.load();
       const { ctx, groups } = this._context(entry.id);
-      const inst = (await mod.build(ctx)) || {};
+      // parts are authored on the un-warped rig; FACE_WARP is applied after
+      this.rig.setWarp(false);
+      let inst;
+      try {
+        inst = mod.build(ctx) || {};
+        if (inst.then) inst = (await inst) || {};
+        if (!anatomy.FACE_WARP.skipParts.includes(entry.id)) this._warpPart(groups);
+      } finally {
+        this.rig.setWarp(anatomy.FACE_WARP.enabled);
+      }
       const meta = mod.meta || {};
       const part = {
         id: entry.id,
@@ -104,6 +113,73 @@ export class Ultron {
       this._emit({ type: 'status', id: entry.id, status: 'error', error: err });
       return null;
     }
+  }
+
+  /**
+   * Apply anatomy.FACE_WARP to every mesh of a freshly built part that lives
+   * under the head joint. Must run while the rig is un-warped; the vertices
+   * are re-expressed relative to the warped joints afterwards.
+   */
+  _warpPart(groups) {
+    if (!anatomy.FACE_WARP.enabled) return;
+    const head = this.rig.joints.head;
+    const rigidJoints = new Set(anatomy.FACE_WARP.rigid.map((n) => this.rig.joints[n]));
+    const isUnder = (o, target) => { for (let p = o; p; p = p.parent) if (p === target) return true; return false; };
+    const rigidOf = (o) => { for (let p = o; p; p = p.parent) if (rigidJoints.has(p)) return p; return null; };
+    this.rig.root.updateMatrixWorld(true);
+    const headInv = head.matrixWorld.clone().invert();
+    const jobs = [];
+    const seen = new Set();
+    for (const g of groups) {
+      if (!isUnder(g, head)) continue;
+      g.traverse((o) => {
+        if (!o.isMesh || seen.has(o.geometry) || rigidOf(o)) return;
+        seen.add(o.geometry);
+        jobs.push({ mesh: o, toHead: headInv.clone().multiply(o.matrixWorld) });
+      });
+    }
+    // re-express relative to the warped joints
+    this.rig.setWarp(true);
+    const P = new THREE.Vector3(), N = new THREE.Vector3(), Q = new THREE.Vector3();
+    for (const { mesh, toHead } of jobs) {
+      const fromHead = new THREE.Matrix4().copy(head.matrixWorld).invert().multiply(mesh.matrixWorld).invert();
+      const nIn = new THREE.Matrix3().getNormalMatrix(toHead);
+      const nOut = new THREE.Matrix3().getNormalMatrix(fromHead);
+      const geo = mesh.geometry;
+      const pos = geo.attributes.position;
+      const nrm = geo.attributes.normal;
+      const morphs = geo.morphAttributes.position || [];
+      const warpAttr = (attr) => {
+        for (let i = 0; i < attr.count; i++) {
+          P.fromBufferAttribute(attr, i).applyMatrix4(toHead);
+          anatomy.warpHeadPoint(P).applyMatrix4(fromHead);
+          attr.setXYZ(i, P.x, P.y, P.z);
+        }
+        attr.needsUpdate = true;
+      };
+      if (nrm) {
+        for (let i = 0; i < pos.count; i++) {
+          Q.fromBufferAttribute(pos, i).applyMatrix4(toHead);
+          N.fromBufferAttribute(nrm, i).applyMatrix3(nIn);
+          anatomy.warpHeadNormal(Q, N).applyMatrix3(nOut).normalize();
+          nrm.setXYZ(i, N.x, N.y, N.z);
+        }
+        nrm.needsUpdate = true;
+      }
+      for (const m of morphs) warpAttr(m);
+      for (const m of geo.morphAttributes.normal || []) {
+        for (let i = 0; i < m.count; i++) {
+          N.fromBufferAttribute(m, i).applyMatrix3(nIn);
+          Q.fromBufferAttribute(pos, i); // approximate: use base position
+          anatomy.warpHeadNormal(Q.applyMatrix4(toHead), N).applyMatrix3(nOut).normalize();
+          m.setXYZ(i, N.x, N.y, N.z);
+        }
+      }
+      warpAttr(pos);
+      geo.computeBoundingSphere();
+      geo.computeBoundingBox();
+    }
+    this.rig.setWarp(false);
   }
 
   /**
