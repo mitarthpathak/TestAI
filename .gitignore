@@ -4,5 +4,6 @@ out/
 *.log
 .DS_Store
 screenshots/**/*.png
+screenshots/**/*.json
 !screenshots/baseline/*.png
 .claude/worktrees/
