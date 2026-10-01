@@ -9,7 +9,7 @@
  *   ?only=jaw,lips    load only these parts
  *   ?isolate=jaw      load everything but show only this part
  *   ?explode=0.5      exploded view
- *   ?bg=black         plain black instead of the film backdrop (bg=reference: garage-ish)
+ *   ?bg=film          teal film backdrop with bokeh (default is pure #000 black for OLED; bg=reference: garage-ish)
  *   ?set=jaw.open=0.8,eyes.lookX=0.4   set part params after load
  *   ?pose=head.ry=0.3                   rotate rig joints (disable idle to keep it)
  */
@@ -90,7 +90,8 @@ export async function createStage(container, { flags, onStatus } = {}) {
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const backdrop = flags.bg === 'black' ? null : createBackdrop();
+  // pure black by default (OLED): no backdrop texture, no grain lifting the blacks
+  const backdrop = flags.bg === 'film' ? createBackdrop() : null;
   scene.background = backdrop || new THREE.Color(0x000000);
   const envMap = createStudioEnvironment(renderer);
   scene.environment = envMap;
@@ -137,7 +138,7 @@ export async function createStage(container, { flags, onStatus } = {}) {
   const tone = new ToneMappingEffect({ mode: ToneMappingMode.AGX });
   const grade = new BrightnessContrastEffect({ brightness: -0.02, contrast: 0.16 });
   const grain = new NoiseEffect({ premultiply: true, blendFunction: BlendFunction.SCREEN });
-  grain.blendMode.opacity.value = capture ? 0.0 : 0.05;
+  grain.blendMode.opacity.value = 0.0;
   const smaa = new SMAAEffect({ preset: SMAAPreset.HIGH });
   composer.addPass(new EffectPass(camera, bloom, vignette, tone, grade, grain));
   composer.addPass(new EffectPass(camera, smaa));
