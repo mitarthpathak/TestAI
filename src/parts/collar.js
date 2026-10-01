@@ -6,9 +6,9 @@
  * Sub-meshes (L = model's left, +X):
  *   collar.core                 dark under-body (open in front of the neck)
  *   collar.base                 flat cap closing the bottom cut
- *   collar.trapezius.<L|R>.<i>  layered trapezius lames sweeping from the neck
- *                               out and down to the shoulders; .lip = thick
- *                               rolled front edge
+ *   collar.trapezius.<L|R>.<i>  layered trapezius lames sloping from the neck
+ *                               (y ~ 0.6) out and down to the shoulder tips
+ *                               (y ~ 0); .band = rolled front edge
  *   collar.recess.<L|R>         dark supraclavicular recess between neck,
  *                               trapezius and clavicle
  *   collar.actuator.<L|R>.<i>   big horizontal ribbed cylinders inside the recess
@@ -17,6 +17,7 @@
  *   collar.pec.<L|R>.<i>        upper chest plates (end cleanly at the cut)
  *   collar.deltoid.<L|R>.<i>    layered shoulder caps
  *   collar.back.<L|R>.<i>       upper back plates
+ *   collar.yoke                 V-notched plate wrapping the base of the neck
  *   collar.sternum              centre plate with the sternal notch
  *
  * Params
@@ -189,24 +190,22 @@ export function build(ctx) {
   const { THREE, geo, materials: M } = ctx;
   const root = ctx.space('chest', 'body');
 
-  // Torso: superellipse stack. The reference is very hunched: the shoulders
-  // form a broad plateau at y ~ 1.05 whose thick front edge (the "band")
-  // frames a deep trough above each clavicle; the neck rises out of the top.
+  // Torso: superellipse stack. No plateau: the trapezius slopes straight
+  // down and out from the neck (y ~ 0.6) to rounded shoulder tips (y ~ 0),
+  // the collarbones run across the upper chest, the bust is cut at y ~ -0.62.
   const torso = geo.profileSurface([
-    { y: -0.7, w: 1.66, zf: 0.56, zb: 0.5, n: 3.0, zc: 0.02 },
-    { y: -0.35, w: 1.76, zf: 0.6, zb: 0.53, n: 3.2, zc: 0.02 },
-    { y: 0.0, w: 1.82, zf: 0.61, zb: 0.55, n: 3.3, zc: 0.01 },
-    { y: 0.35, w: 1.84, zf: 0.6, zb: 0.56, n: 3.3, zc: 0.0 },
-    { y: 0.62, w: 1.83, zf: 0.57, zb: 0.56, n: 3.2, zc: 0.0 },
-    { y: 0.84, w: 1.78, zf: 0.55, zb: 0.55, n: 3.1, zc: -0.01 },
-    { y: 0.97, w: 1.66, zf: 0.52, zb: 0.54, n: 3.0, zc: -0.02 },
-    { y: 1.05, w: 1.44, zf: 0.46, zb: 0.52, n: 2.8, zc: -0.04 },
-    { y: 1.1, w: 1.1, zf: 0.38, zb: 0.5, n: 2.6, zc: -0.07 },
-    { y: 1.14, w: 0.86, zf: 0.3, zb: 0.48, n: 2.4, zc: -0.1 },
-    { y: 1.18, w: 0.74, zf: 0.24, zb: 0.46, n: 2.2, zc: -0.12 },
+    { y: -0.72, w: 1.7, zf: 0.58, zb: 0.52, n: 3.0, zc: 0.02 },
+    { y: -0.4, w: 1.77, zf: 0.6, zb: 0.54, n: 3.2, zc: 0.02 },
+    { y: -0.12, w: 1.8, zf: 0.6, zb: 0.55, n: 3.2, zc: 0.01 },
+    { y: 0.06, w: 1.74, zf: 0.58, zb: 0.54, n: 3.1, zc: 0.0 },
+    { y: 0.18, w: 1.56, zf: 0.55, zb: 0.53, n: 3.0, zc: -0.01 },
+    { y: 0.3, w: 1.26, zf: 0.5, zb: 0.51, n: 2.8, zc: -0.03 },
+    { y: 0.42, w: 0.94, zf: 0.43, zb: 0.48, n: 2.6, zc: -0.05 },
+    { y: 0.52, w: 0.7, zf: 0.37, zb: 0.45, n: 2.4, zc: -0.06 },
+    { y: 0.6, w: 0.56, zf: 0.33, zb: 0.43, n: 2.3, zc: -0.06 },
   ]);
   const Y_BOT = -0.62;
-  const Y_TOP = 1.18;
+  const Y_TOP = 0.6;
 
   const frontZ = (x, y) => {
     const s = torso.section(y);
@@ -219,16 +218,22 @@ export function build(ctx) {
     const r = Math.min(1, Math.abs(x) / s.w);
     return Math.sign(x) * Math.asin(Math.pow(r, s.n / 2));
   };
+  // collarbone line: low beside the sternal notch, rising gently outward
   const clavY = (x) => {
     const a = Math.abs(x);
-    return 0.14 + 0.34 * smooth(0.12, 0.8, a) + 0.1 * smooth(0.8, 1.55, a);
+    return 0.1 + 0.18 * smooth(0.05, 1.1, a) - 0.06 * smooth(1.3, 1.7, a);
   };
-  // The band: front edge of the shoulder plateau, as a front-view (x, y)
-  // path from the neck pillar out and down to the clavicle (LEFT side).
-  const bandPath = new THREE.SplineCurve([
-    [0.62, 1.15], [0.95, 1.105], [1.22, 1.05], [1.42, 0.96], [1.53, 0.82], [1.57, 0.66], [1.58, 0.56],
-  ].map(([x, y]) => new THREE.Vector2(x, y)));
-  const BAND = bandPath.getSpacedPoints(80);
+  // trapezius front edge: angle on the torso (left side, positive) per height.
+  // Near the neck it wraps to the side, at the shoulder it comes forward.
+  const Y_BAND0 = Y_TOP - 0.02;
+  const Y_BAND1 = 0.34;
+  const uF = (y) => lerp(0.86, 1.18, smooth(Y_BAND1, Y_TOP, y));
+  const BAND = [];
+  for (let k = 0; k <= 80; k++) {
+    const y = lerp(Y_BAND0, Y_BAND1, k / 80);
+    const x = torso.surface(uF(y), y, new THREE.Vector3()).x;
+    BAND.push(new THREE.Vector2(x, y));
+  }
   /** band x at height y (y decreases along the path) */
   const xBand = (y) => {
     if (y >= BAND[0].y) return BAND[0].x;
@@ -237,10 +242,8 @@ export function build(ctx) {
     }
     return BAND[BAND.length - 1].x;
   };
-  // trapezius front edge as a torso angle (left side, positive)
-  const uF = (y) => Math.abs(uAtX(xBand(Math.min(y, Y_TOP)), y));
-  // top of the armour ring: highest at the neck sides, dipping toward the back
-  const yTop = (u) => Y_TOP - 0.3 * smooth(1.45, Math.PI, Math.abs(u));
+  // top of the armour: highest at the neck sides, dipping a little at the nape
+  const yTop = (u) => Y_TOP - 0.08 * smooth(1.6, Math.PI, Math.abs(u));
 
   // materials
   const coreMat = M.get('darkMetal');
@@ -325,8 +328,8 @@ export function build(ctx) {
     // lames: lower one wraps round to the back, upper one caps the neck side;
     // both tops follow yTop(u) so the plateau slopes down toward the spine.
     const lames = [
-      { y0: 0.8, y1: 1.07, b: 2.5, off: 0.045, mat: trapAlt, inset: 0.1 },
-      { y0: 1.0, y1: Y_TOP, b: 2.05, off: 0.068, mat: trapMat, inset: 0.0 },
+      { y0: 0.02, y1: 0.4, b: 2.5, off: 0.045, mat: trapAlt, inset: 0.05 },
+      { y0: 0.3, y1: Y_TOP, b: 2.2, off: 0.055, mat: trapMat, inset: 0.0 },
     ];
     lames.forEach((l, i) => {
       const fn = (s, t) => {
@@ -345,7 +348,7 @@ export function build(ctx) {
     {
       const fn = (s, t) => {
         const u = lerp(2.2, Math.PI - 0.035, side > 0 ? s : 1 - s);
-        return [U(u), lerp(0.46, yTop(u) - 0.02, t)];
+        return [U(u), lerp(0.08, yTop(u) - 0.02, t)];
       };
       const m = plate(fn, `collar.trapezius.${key}.2`, trapMat, { offset: 0.03, thickness: 0.07, bevel: 0.024, segU: 22, segV: 14 });
       addLift(m, new THREE.Vector3(0.1 * side, 1, -0.2), 0.02, 'shrug');
@@ -366,7 +369,7 @@ export function build(ctx) {
     }
     const bandCurve = new THREE.CatmullRomCurve3(pts);
     bandCurves[key] = bandCurve;
-    const lip = geo.sweptSection(bandCurve, geo.roundedSection(0.105, 0.034, 5, 32), {
+    const lip = geo.sweptSection(bandCurve, geo.roundedSection(0.08, 0.03, 5, 32), {
       steps: 90,
       up: new THREE.Vector3(0, 0.3, 1).normalize(),
       scale: (t) => [0.6 + 0.5 * Math.sin(Math.PI * Math.min(1, 0.08 + t * 1.02)), 1 - 0.2 * t],
@@ -380,7 +383,7 @@ export function build(ctx) {
   const clavPts = (side) => {
     const out = [];
     for (let k = 0; k <= 12; k++) {
-      const x = lerp(0.15, 1.68, k / 12);
+      const x = lerp(0.15, 1.52, k / 12);
       const y = clavY(x);
       out.push(new THREE.Vector3(x * side, y, frontZ(x, y) + 0.03 - 0.1 * smooth(1.4, 1.7, x)));
     }
@@ -400,8 +403,8 @@ export function build(ctx) {
       return target;
     };
     const Ledge = (s, target) => {
-      const x = lerp(0.54, 1.56, s);
-      clav.getPointAt(clamp01((x - 0.15) / 1.53), target);
+      const x = lerp(BAND[0].x - 0.01, BAND[BAND.length - 1].x + 0.04, s);
+      clav.getPointAt(clamp01((x - 0.15) / 1.37), target);
       target.z -= 0.06;
       target.y += 0.03;
       return target;
@@ -412,7 +415,7 @@ export function build(ctx) {
       Uedge(s, A);
       Ledge(s, B);
       target.lerpVectors(A, B, t);
-      const depth = 0.32 * Math.sin(Math.PI * t) * Math.pow(Math.sin(Math.PI * (0.06 + s * 0.9)), 0.5);
+      const depth = 0.17 * Math.sin(Math.PI * t) * Math.pow(Math.sin(Math.PI * (0.06 + s * 0.9)), 0.5);
       target.x -= side * depth * 0.25;
       target.z -= depth;
       return target;
@@ -545,14 +548,14 @@ export function build(ctx) {
     });
     // deltoid lames: upper overlaps lower
     const delts = [
-      { y0: Y_BOT, y1: -0.14, off: 0.0, mat: pecMat },
-      { y0: -0.2, y1: 0.4, off: 0.015, mat: pecAlt },
-      { y0: 0.34, y1: 0.9, off: 0.03, mat: trapMat },
+      { y0: Y_BOT, y1: -0.3, off: 0.0, mat: pecMat },
+      { y0: -0.36, y1: 0.0, off: 0.015, mat: pecAlt },
+      { y0: -0.06, y1: 0.26, off: 0.03, mat: trapMat },
     ];
     delts.forEach((d, i) => {
       const fn = (s, t) => {
         const y = lerp(d.y0, d.y1, t);
-        const x0 = lerp(1.32, xBand(y) + 0.02, smooth(0.5, 0.72, y));
+        const x0 = Math.min(lerp(1.32, xBand(y) + 0.02, smooth(0.0, 0.22, y)), torso.section(y).w * 0.97);
         const ua = Math.abs(uAtX(x0, y));
         return [lerp(ua, 2.1, side > 0 ? s : 1 - s) * side, y];
       };
@@ -562,8 +565,8 @@ export function build(ctx) {
     });
     // upper back
     const backs = [
-      { y0: Y_BOT, y1: -0.06, off: 0.0, mat: pecMat },
-      { y0: -0.1, y1: 0.48, off: 0.018, mat: trapAlt },
+      { y0: Y_BOT, y1: -0.24, off: 0.0, mat: pecMat },
+      { y0: -0.3, y1: 0.16, off: 0.018, mat: trapAlt },
     ];
     backs.forEach((b, i) => {
       const fn = (s, t) => [lerp(2.1, Math.PI - 0.03, side > 0 ? s : 1 - s) * side, lerp(b.y0, b.y1, t)];
@@ -572,11 +575,26 @@ export function build(ctx) {
     });
   }
 
+  // --------------------------------------------------------------- yoke
+  // V-notched plate wrapping the base of the neck between the collarbones
+  {
+    const fn = (s, t) => {
+      const x = lerp(-0.5, 0.5, s);
+      const a = Math.abs(x);
+      const lo = clavY(x) - 0.05;
+      const hi = Math.max(lo + 0.08, 0.32 + 0.06 * smooth(0.12, 0.5, a) - 0.1 * (1 - smooth(0.0, 0.16, a)) - 0.08 * smooth(0.36, 0.5, a));
+      const y = lerp(lo, hi, t);
+      return [uAtX(x, y), y];
+    };
+    const m = plate(fn, 'collar.yoke', pecAlt, { offset: 0.04, thickness: 0.07, segU: 28, segV: 10 });
+    addLift(m, new THREE.Vector3(0, 0.2, 1), 0.015, 'breathe');
+  }
+
   // ------------------------------------------------------------ sternum
   {
     const fn = (s, t) => {
       const x = lerp(-0.13, 0.13, s);
-      const top = 0.02 + 0.9 * Math.abs(x);
+      const top = clavY(0) - 0.03 + 0.9 * Math.abs(x);
       const y = lerp(Y_BOT, top, t);
       return [uAtX(x, y), y];
     };
