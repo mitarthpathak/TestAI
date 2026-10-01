@@ -89,7 +89,7 @@ export const LANDMARKS = {
   neckBase:     [0, 0.3, -0.02],
   neckTop:      [0, 1.3, -0.05],
   neckRadius:   0.75,   // outer edge of the side pillars (front ref: ~head width at eye level)
-  trapeziusTop: [0.42, 1.15, -0.2], // trapezius crest beside the neck (mirror X), ~chin height
+  trapeziusTop: [0.8, 1.29, -0.1], // trapezius crest beside the neck (mirror X)
   collarWidth:  1.9,    // half-span to the shoulder tip
   collarY:      0.45,   // shoulder-cap centre height
 };
