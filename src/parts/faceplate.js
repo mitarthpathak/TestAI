@@ -152,7 +152,7 @@ export function build(ctx) {
     const g = geo.surfaceSheet({
       surface: (u, y, P) => field.surface(u, y, P),
       normal: (u, y, N) => field.normalAt(field.surface(u, y, _P), N),
-      u0: -1.15, u1: 1.15, y0: 0.29, y1: 1.2, segU: 110, segV: 84, offset: -0.014,
+      u0: -1.15, u1: 1.15, y0: 0.29, y1: 1.2, segU: 90, segV: 70, offset: -0.014,
       keep: (C) => C.y < craniumBrowY(C.x) + 0.03
         && !insideSocket(anatomy, 1, C.x, C.y, 1.0) && !insideSocket(anatomy, -1, C.x, C.y, 1.0)
         && !anatomy.insideCutout(C, ['cheekL', 'cheekR']),
@@ -191,7 +191,7 @@ export function build(ctx) {
     const wY = (x) => 0.52 + 0.075 * Math.abs(Math.cos((Math.PI * x) / 0.088));
     const kg = ribbonPlate(THREE, geo, {
       chart, railA: rail(keel, -1), railB: rail(keel, 1),
-      segS: 44, segT: 70, offset: 0, thickness: 0.06, bevel: 0.004, gap: 0.0,
+      segS: 34, segT: 56, offset: 0, thickness: 0.06, bevel: 0.004, gap: 0.0,
       lift: (s, t, P, N) => {
         const e = Math.abs(2 * s - 1);
         const groove = Math.exp(-Math.pow((e - 0.3) / 0.035, 2)) * sm(P.y, 0.88, 0.8) * sm(P.y, 0.66, 0.74);
@@ -252,6 +252,46 @@ export function build(ctx) {
         return pts;
       });
       head.add(ctx.mesh(loftRings(THREE, geo, loops), frameMat, `faceplate.socket.${key}`));
+
+      // stepped concentric almond frames (model-side sculpt): each ring is a
+      // separate layer, one step higher than the ring inside it, growing mostly
+      // outward / downward (the brow hoods the top, the nose clamps the inner corner)
+      const base = [];
+      for (let i = 0; i < NS; i++) {
+        const t = (i / NS) * Math.PI * 2;
+        const [x, y] = socketPoint(anatomy, side, t, 1.12);
+        const [xa, ya] = socketPoint(anatomy, side, t - 0.01, 1.12);
+        const [xb, yb] = socketPoint(anatomy, side, t + 0.01, 1.12);
+        let nx = yb - ya, ny = -(xb - xa);
+        const nl = Math.hypot(nx, ny) || 1;
+        nx /= nl; ny /= nl;
+        const e = anatomy.LANDMARKS.eyeL;
+        if (nx * (x - side * e[0]) + ny * (y - e[1]) < 0) { nx = -nx; ny = -ny; }
+        const o = side * x - e[0], v = y - e[1];
+        const w = lerp(0.12, 1, sm(o, -0.19, 0.04)) * (v > 0 ? lerp(1, 0.75, sm(v, 0.0, 0.07)) : 1) * (1 + 0.35 * sm(o, 0.08, 0.17));
+        base.push([x, y, nx, ny, w]);
+      }
+      const ringLoop = (d, h) => base.map(([x, y, nx, ny, w]) => {
+        const px = x + nx * d * w, py = y + ny * d * w;
+        return V(px, py, (surfZ(px, py) ?? 0.5) + h);
+      });
+      const RINGS = [
+        { d0: 0.0, d1: 0.024, h: 0.014, mat: steelC },
+        { d0: 0.029, d1: 0.054, h: 0.028, mat: frameMat },
+        { d0: 0.06, d1: 0.084, h: 0.04, mat: browMatB },
+        { d0: 0.09, d1: 0.118, h: 0.05, mat: steelD },
+      ];
+      RINGS.forEach((R, i) => {
+        const rows = [
+          ringLoop(R.d1, R.h - 0.03),
+          ringLoop(R.d1, R.h - 0.004),
+          ringLoop(R.d1 - 0.004, R.h),
+          ringLoop(R.d0 + 0.004, R.h),
+          ringLoop(R.d0, R.h - 0.004),
+          ringLoop(R.d0, R.h - 0.03),
+        ];
+        head.add(ctx.mesh(loftRings(THREE, geo, rows), R.mat, `faceplate.socket.ring${i}.${key}`));
+      });
     }
 
     // ---------------------------------------------------------- brow (browL / browR joint)
@@ -310,7 +350,7 @@ export function build(ctx) {
       const ticks = [0.18 + 0.07 * i, 0.42 + 0.05 * i, 0.66 - 0.04 * i];
       const g = ribbonPlate(THREE, geo, {
         chart, railA: mixRail(rIn, rOut, S.s0), railB: mixRail(rIn, rOut, S.s1),
-        segS: 10, segT: 60, offset: 0, thickness: 0.1, bevel: 0.005,
+        segS: 10, segT: 44, offset: 0, thickness: 0.1, bevel: 0.005,
         gapA: i ? 0.003 : 0.002, gapB: 0.0, gap0: 0.0, gap1: 0.0,
         lift: (s, t) => {
           let h = S.h0 + (S.h1 - S.h0) * s;

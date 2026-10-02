@@ -5,6 +5,7 @@
  *
  *  - eyes.cavity.{L,R}        dark funnel behind the faceplate socket frame
  *  - eyes.rim.{L,R}           polished inner socket rim, eyes.rimGlow.{L,R} red-lit lower lip
+ *  - eyes.stepFrame.{L,R}     stepped almond terraces descending into the socket
  *  - eyes.lookPivot.{L,R}     gaze pivot (lookX / lookY), carries:
  *      eyes.lens.{L,R}        HDR iris: white-hot core, red ring, dark concentric
  *                             ring structure + radial slits (poster close-up)
@@ -159,6 +160,7 @@ export function build(ctx) {
   const ringMat = M.get('darkMetal', { roughness: 0.26, metalness: 1.0 });
   const cavityMat = M.get('cavity', { side: THREE.DoubleSide, color: 0x040405, roughness: 0.85 });
   const rimMat = M.get('gunmetal', { roughness: 0.22 });
+  const stepMat = M.get('gunmetal', { roughness: 0.26, color: 0x4a5058, side: THREE.DoubleSide });
   const rimGlowMat = M.get('redAccent', { intensity: 3.0 });
 
   const gain = new THREE.Color(1, 1, 1);
@@ -276,9 +278,18 @@ export function build(ctx) {
       }
       return pts;
     };
+    // stepped almond frames descending into the socket (model-side sculpt):
+    // two polished terraces, then the dark funnel
+    const steps = [
+      loopAt(1.02, (x, y) => surfZ(x, y) - 0.026),
+      loopAt(0.995, (x, y) => surfZ(x, y) - 0.028),
+      loopAt(0.993, (x, y) => surfZ(x, y) - 0.044),
+      loopAt(0.968, (x, y) => surfZ(x, y) - 0.046),
+      loopAt(0.966, (x, y) => surfZ(x, y) - 0.062),
+    ];
+    hs.add(ctx.mesh(loftLoops(THREE, steps), stepMat, `eyes.stepFrame.${key}`));
     const rows = [
-      loopAt(1.02, (x, y) => surfZ(x, y) - 0.03),
-      loopAt(0.965, (x, y) => surfZ(x, y) - 0.062),
+      loopAt(0.966, (x, y) => surfZ(x, y) - 0.062),
       loopAt(0.9, () => eye[2] - 0.035),
       loopAt(0.72, () => eye[2] - 0.08),
       loopAt(0.4, () => eye[2] - 0.105),
@@ -286,7 +297,7 @@ export function build(ctx) {
     ];
     hs.add(ctx.mesh(loftLoops(THREE, rows), cavityMat, `eyes.cavity.${key}`));
     {
-      const ring = loopAt(0.968, (x, y) => surfZ(x, y) - 0.054);
+      const ring = loopAt(0.97, (x, y) => surfZ(x, y) - 0.047);
       const g = geo.sweptSection(new THREE.CatmullRomCurve3(ring, true), geo.roundedSection(0.0055, 0.0055, 2, 10), { steps: 160, up: V(0, 0, 1), caps: false });
       hs.add(ctx.mesh(g, rimMat, `eyes.rim.${key}`));
       // red-lit lower lip of the socket (poster)
