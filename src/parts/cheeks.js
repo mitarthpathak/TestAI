@@ -254,12 +254,12 @@ export function build(ctx) {
   const ringMat = M.get('gunmetal', { roughness: 0.34, color: 0x737a82, panel: 14, seed: 54, lineWidth: 0.004 });
   // round 6: the stepped rings read as lit metal treads (sculpt), not a black tunnel
   const treadMat = M.get('chrome', { roughness: 0.38, metalness: 0.75, color: 0xb3bac1, panel: 12, seed: 55, lineWidth: 0.0035 });
-  treadMat.envMapIntensity = 2.1; // round 5: bold metal rings, not a dark tunnel
+  treadMat.envMapIntensity = 2.4; // round 5: bold metal rings, not a dark tunnel
   const plateMat = M.get('gunmetal', { roughness: 0.34, color: 0x7d848c, panel: 18, seed: 57, lineWidth: 0.0025 });
   const vaneMat = M.get('chrome', { roughness: 0.32, metalness: 0.7, color: 0xa4abb2, seed: 59 });
   // round 7 (concept 3/4): the turbine face is a FLAT LIT disc, not a dark hole
   const floorMat = M.get('chrome', { roughness: 0.36, metalness: 0.6, color: 0xaeb5bc, panel: 16, seed: 58, lineWidth: 0.003 });
-  floorMat.envMapIntensity = 2.2; floorMat.roughness = 0.42;
+  floorMat.envMapIntensity = 2.7; floorMat.roughness = 0.4; // round 8: lit flat face
   const darkMat = M.get('darkMetal');
   const cavityMat = M.get('cavity');
   const capMat = M.get('gunmetal', { roughness: 0.34, color: 0x737a82 });
@@ -307,9 +307,13 @@ export function build(ctx) {
 
   // band2 + jowl: wrap the back / bottom of the disc, then hand over to a
   // TAIL (swept on the face surface) that runs down and in to the chin.
-  const B2_HW = 0.046, B2_END = deg(-82);
-  const B2_RC = spiral(0.462, 0.49, deg(-60), B2_END);
-  const b2Top = topFn(0.055, 0.08, 0.016);
+  const B2_HW = 0.046, B2_END = deg(-74);
+  const B2_RC = spiral(0.462, 0.405, deg(-5), B2_END, 1.2); // round 8: tucks in below the disc (front width)
+  const b2Top0 = topFn(0.055, 0.08, 0.016);
+  // round 8 (front film still): below the hub band2 sinks toward the disc plane so
+  // the lower face narrows into the U instead of bulging out sideways
+  const b2Sink = (th) => 0.055 * SS(-wrapA(th), deg(15), deg(70));
+  const b2Top = (th, r) => b2Top0(th, r) - b2Sink(th);
   const band2Geo = polarSweep({ th0: B2_END, th1: deg(104), rc: B2_RC, hw: B2_HW, top: b2Top, bottom: bottomFn, corner: 0.013, crown: 0.004, segs: 76, ends: [0, 0.12], skirt: deepFront });
 
 
@@ -332,7 +336,7 @@ export function build(ctx) {
   // chin recedes below the lip carrier (matches jaw.js chinPull)
   const chinPull = (x, y) => 0.04 * SS(0.12 - y, 0, 0.3) * (0.55 + 0.45 * Math.exp(-Math.pow(x / 0.3, 2)));
   const jowlZ = (x, y) => {
-    const q = Math.abs(x) / (JW - 0.06 * SS(0.3 - y, 0, 0.5));
+    const q = Math.abs(x) / (JW - 0.06 * SS(0.3 - y, 0, 0.5) - 0.06 * SS(0.34 - y, 0, 0.35)); // round 8: narrower below the discs
     return JZC + JZF * ellZ(q) - 0.06 * SS(0.1 - y, 0, 0.35);
   };
   const CHIN_BALL = [0, -0.1, 0.42, 0.37]; // x, y, z, radius (HEAD space)
@@ -407,8 +411,10 @@ export function build(ctx) {
     // round 5: U raised (close-up: its bottom sits just under the scale fan)
     // round 7 (close-up + sculpt): the U sits LOW and its inner arm runs down
     // beside the chin to end at the chin button, not up at the mouth corner
-    [0.62, 0.25], [0.605, 0.13], [0.56, 0.03], [0.48, -0.022], [0.4, -0.035], [0.3, -0.045],
-    [0.225, -0.052], [0.17, -0.05], [0.135, -0.035],
+    // round 8 (front film still): the U closes in under the turbine (C shape),
+    // so the lower face narrows below the discs into the long muzzle / chin
+    [0.545, 0.215], [0.5, 0.16], [0.435, 0.115], [0.36, 0.08], [0.29, 0.045], [0.235, 0.015],
+    [0.19, -0.012], [0.157, -0.03], [0.135, -0.035],
   ].map(([x, y]) => new THREE.Vector2(x, y)));
   const _ut = new THREE.Vector2();
   const _ubs = U_BASE.getSpacedPoints(80);
@@ -422,11 +428,12 @@ export function build(ctx) {
     const p = U_BASE.getPointAt(THREE.MathUtils.clamp(a, 0, 1));
     U_BASE.getTangentAt(THREE.MathUtils.clamp(a, 0, 1), _ut);
     let nx = -_ut.y, ny = _ut.x;
-    if (nx * (p.x - 0.4) + ny * (p.y - 0.24) < 0) { nx = -nx; ny = -ny; }
+    if (nx * (p.x - 0.3) + ny * (p.y - 0.3) < 0) { nx = -nx; ny = -ny; }
     return { x: p.x, y: p.y, nx, ny };
   };
   // band width shrinks toward the mouth end (bands converge beside the chin)
   // ...and at the outer arm, where they tuck behind the turbine instead of stepping out past the face edge
+  const U_DW = 0.84; // round 8: slimmer U stack (front width)
   const uWid = (a) => 1 - 0.5 * SS(a, 0.62, 1) - 0.62 * SS(0.3 - a, 0, 0.3);
   const uRibbon = (d0, d1, lift, { a0 = 0, a1 = 1, crown = 0.014, sink = 0.035, tilt = 0.0 } = {}) => (a, b, t) => {
     const f = uFrame(a);
@@ -434,7 +441,7 @@ export function build(ctx) {
     // clean tapered tips: both edges converge on the band centre line at the ends
     const tip = 0.12 + 0.88 * SS(a, a0, a0 + 0.13) * (0.6 + 0.4 * SS(a1 - a, 0, 0.1)); // round 7: blunt ends against the chin
     const dm = (d0 + d1) / 2;
-    const d = (dm + (THREE.MathUtils.lerp(d0, d1, b) - dm) * tip) * w;
+    const d = (dm + (THREE.MathUtils.lerp(d0, d1, b) - dm) * tip) * w * U_DW;
     // ends dive into the face so the plates read as tucked, not hanging
     const endK = SS(a, a0, a0 + 0.1) * SS(a1 - a, 0, 0.08);
     // outer edge stands proud (overlapping scales) so each plate tilts up into the key light
@@ -497,7 +504,7 @@ export function build(ctx) {
   // side (toward the mouth) round to straight down
   // close-up: a compact fan right beside the mouth corner, above the U plates
   const FC = [0.36, 0.235]; // round 7: big fan centred under the turbine, reaching to the muzzle + U
-  const FC_J = [0.4, 0.215]; // jowl web centre (under the turbine)
+  const FC_J = [0.36, 0.235]; // round 8: pulled in with the U // jowl web centre (under the turbine)
   const ROWS = [
     { r0: 0.045, r1: 0.08, n: 4, lift: 0.012, ph0: 176, ph1: 296 },
     { r0: 0.077, r1: 0.112, n: 5, lift: 0.017, ph0: 176, ph1: 296 },
@@ -548,8 +555,8 @@ export function build(ctx) {
   // outer jowl web under / behind the turbine: closes the gaps between the
   // U bands (3/4 view) without covering the cavity
   const jowlBackGeo = lowPlate((a, b, t) => {
-    const ph = deg(THREE.MathUtils.lerp(262, 372, a));
-    const r = THREE.MathUtils.lerp(0.17, 0.3, b);
+    const ph = deg(THREE.MathUtils.lerp(255, 328, a)); // round 8: stays under the disc (no block across the cavity)
+    const r = THREE.MathUtils.lerp(0.15, 0.275, b);
     return lowPt(FC_J[0] + r * Math.cos(ph), FC_J[1] + r * Math.sin(ph), -0.004, t);
   }, { thickness: 0.08, bevel: 0.006, segU: 22, segV: 7 });
 
@@ -599,8 +606,10 @@ export function build(ctx) {
   const RW = RIM_RC - RIM_HW + 0.003; // cavity wall radius (inside the rim)
   // round 6 (3D sculpt, side view): a DEEP recessed disc — six concentric
   // stepped rings descend from the rim to a small flat turbine face + hub.
-  const Z = { s1: 0.006, floor: -0.118, plate: -0.098, vane: -0.106 };
-  const STEP_N = 6, STEP_R1 = 0.135, STEP_DZ = (Z.s1 - (Z.floor + 0.012)) / STEP_N;
+  // round 8 (concept 3/4): SHALLOW — the rings step down only a little to a
+  // flat lit turbine face close to the rim plane
+  const Z = { s1: 0.018, floor: -0.048, plate: -0.03, vane: -0.04 };
+  const STEP_N = 5, STEP_R1 = 0.158, STEP_DZ = (Z.s1 - (Z.floor + 0.012)) / STEP_N;
   const wallGeo = polarLathe([
     { r: RW, z: Z.s1 - 0.03 },
     { r: RW, f: (th, r) => rimTop(th, r) - 0.012 },
@@ -619,7 +628,7 @@ export function build(ctx) {
   // ------------------------------------------------------------ rotor
   // flat turbine face with concentric stepped grooves (concept: speaker-like rings)
   const floorGeo = polarLathe([
-    { r: STEP_R1, z: Z.floor }, { r: 0.112, z: Z.floor }, { r: 0.108, z: Z.floor + 0.005 }, { r: 0.09, z: Z.floor + 0.005 },
+    { r: STEP_R1, z: Z.floor }, { r: 0.136, z: Z.floor }, { r: 0.132, z: Z.floor + 0.004 }, { r: 0.112, z: Z.floor + 0.004 }, { r: 0.108, z: Z.floor + 0.007 }, { r: 0.09, z: Z.floor + 0.007 },
     { r: 0.086, z: Z.floor + 0.01 }, { r: 0.0, z: Z.floor + 0.01 },
   ], 96);
   // small dark hub disc (the swirl vanes fill the rest of the cavity)
@@ -644,7 +653,7 @@ export function build(ctx) {
   // turbine vane: thin, slightly swept blade built in its own frame so the
   // iris param can pitch it about its radial axis.
   const VANES = 14;
-  const vR0 = 0.07, vR1 = 0.128, vSweep = 0.12, vH = 0.01;
+  const vR0 = 0.07, vR1 = 0.15, vSweep = 0.12, vH = 0.01;
   const vanePts = [];
   for (let i = 0; i <= 8; i++) {
     const s = i / 8;

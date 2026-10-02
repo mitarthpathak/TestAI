@@ -1,23 +1,24 @@
 /**
  * PART: fins — the two stand-off horn blades that frame the face like ( ).
  *
- * Each blade follows LANDMARKS.finCurveL (mirrored for the right): rooted in a
- * bracket on the upper cranium side (joint finL / finR), a short free spike
- * rises above the bracket, the blade bows out around the cheek turbine
- * (outer edge x ~1.08 at y ~0.72) and ends in a forward tusk that curls in
- * toward the mouth corner. A thinner inner blade runs parallel inside the
- * upper half (concept art "double blade") and merges into the main blade.
+ * Each blade (round 8): a short free tapering tip just above the brow, a
+ * contact zone where the blade's inner edge sinks flush into the skull side
+ * (no strut / bracket bar anywhere), then the broad bevelled C bows out
+ * (outer edge x ~1.035 at y ~0.76) round the back of the cheek turbine and
+ * ends in a hook that curls in toward the mouth corner (y ~0.18). A thinner
+ * inner blade runs parallel behind the upper half ("double blade").
  *
  * Authoring: LEFT side in HEAD space, converted to the joint's local space
- * (origin = joint) so the pivot sits at the root. Right side = X mirror.
+ * (origin = joint finL). Right side = X mirror. The flare / sweep pivot sits
+ * at the skull contact point.
  *
  * Meshes (K = L | R):
- *   fins.socket.K           static socket on the skull (collar + bolts)
- *   fins.pivot.K            Group at the joint; flare / sweep rotate it
- *     fins.knuckle.K        ball in the socket
- *     fins.bracket.K        arm from the ball to the blade
+ *   fins.socket.K           low seat ring on the skull under the contact (collar + bolts)
+ *   fins.pivot.K            Group at the contact; flare / sweep rotate it
+ *     fins.knuckle.K        flush seat ring (moves with the blade)
  *     fins.blade.K          main lens-section blade with bevels
- *     fins.ridge.K          raised centre spine on the blade face
+ *     fins.ridge.K          raised spine on the blade face
+ *     fins.groove.K         dark panel groove down the face
  *     fins.edge.K           polished outer bevel strip
  *     fins.innerPivot.K -> fins.inner.K   thinner inner blade (split opens it)
  *
@@ -39,7 +40,6 @@ export function build(ctx) {
   const innerMat = M.get('gunmetal', { roughness: 0.3, color: 0x60676f, panel: 4, seed: 63, lineWidth: 0.003 });
   const ridgeMat = M.get('chrome', { roughness: 0.14, color: 0xb0b6bc });
   const edgeMat = M.get('chrome', { roughness: 0.08, color: 0xc4c9ce });
-  const bracketMat = M.get('gunmetal', { roughness: 0.3, color: 0x6a7179 });
   const knuckleMat = M.get('chrome', { roughness: 0.2, color: 0x7d838a });
   const socketMat = M.get('gunmetal', { roughness: 0.32 });
   const darkMat = M.get('darkMetal');
@@ -53,28 +53,45 @@ export function build(ctx) {
   // film / ILM concept: the free top spike sits only ~0.3 above the eyes,
   // just outside the cheek bands; the root reaches the cranium via the
   // inner connector blade (see below).
+  // round 8: the blade's TOP END is its root — it dives flush into the skull
+  // side high on the temple (front still: the ( ) frame touches the head at
+  // ~brow height; no strut at eye level). ROOT_* = where it enters the shell.
+  // contact zone: the upper blade's inner edge sinks into the skull side
+  // (front still: the top of the ( touches the head silhouette); above it a
+  // free tapering tip. ROOT_* = skull point under the contact (pivot).
+  // contact zone: the upper blade's inner edge sinks into the skull side
+  // (front still: the top of the ( touches the head silhouette); above it a
+  // free tapering tip. ROOT_* = skull point under the contact (pivot).
+  // round 8: mid / lower blade moved forward (3/4 + film front: the C hugs
+  // the outside of the turbine rim; front ( ) outline unchanged).
+  // contact zone: the upper blade's inner edge sinks into the skull side
+  // just above the brow band (front still: the top of the ( touches the head
+  // silhouette; film + sculpt: the blade starts at ~brow height), above it a
+  // short free tapering tip. ROOT_* = skull point under the contact (pivot).
+  // Lower half runs round the BACK of the turbine rim (sculpt), the hook
+  // comes forward under it and curls in at mouth level.
+  // contact zone: the upper blade's inner edge sinks into the skull side
+  // just above the brow band (front still: the top of the ( touches the head
+  // silhouette; film + sculpt: the blade starts at ~brow height), above it a
+  // short free tapering tip. ROOT_* = skull point under the contact (pivot).
+  // Lower half runs round the BACK of the turbine rim (sculpt), the hook
+  // comes forward under it and curls in at mouth level.
+  const ROOT_U = 1.66, ROOT_Y = 1.24;
+  const skullP = anatomy.headSurface(ROOT_U, ROOT_Y, V(0, 0, 0));
+  const skullN = anatomy.headNormal(ROOT_U, ROOT_Y, V(0, 0, 0));
   const mainPts = [
-    // round 5: the whole C leans FORWARD (concept 3/4 + film front: a thick
-    // blade hugging the outside of the turbine, hook reaching toward the
-    // mouth); x (front ( ) outline) unchanged. Top = free spike.
-    // round 6 (3D sculpt, side view): the blade sits well BEHIND the turbine —
-    // free top just above eye level, outer curve round the back of the disc,
-    // lower end low and forward under the turbine near the jaw. x (front ( )
-    // outline, max ~1.09 at y ~0.75) unchanged.
-    // round 7: slim upper extension rising from the free top behind the temple
-    // (front still: the ( ) frame reaches ~y 1.45; sculpt: the broad blade stays low)
-    // round 7 (sculpt overlay): upper half swung BACK behind the turbine
-    V(0.72, 1.47, -0.21),
-    V(0.84, 1.37, -0.13),
-    V(0.92, 1.26, -0.06),
-    V(0.99, 1.14, -0.01),
-    V(1.06, 1.02, 0.03),
-    V(1.095, 0.86, 0.06),
-    V(1.09, 0.66, 0.1),
-    V(1.04, 0.47, 0.16),
-    V(0.95, 0.33, 0.29),
-    V(0.85, 0.25, 0.39),
-    V(0.77, 0.21, 0.45),
+    V(0.755, 1.34, -0.13),
+    V(0.785, 1.25, -0.085),
+    V(0.86, 1.15, -0.02),
+    V(0.945, 1.04, 0.04),
+    V(1.01, 0.9, 0.095),
+    V(1.035, 0.76, 0.135),
+    V(1.025, 0.6, 0.175),
+    V(0.98, 0.45, 0.22),
+    V(0.905, 0.33, 0.295),
+    V(0.82, 0.25, 0.39),
+    V(0.735, 0.2, 0.475),
+    V(0.665, 0.18, 0.545),
 ].map(toLocal);
   const mainCurve = new THREE.CatmullRomCurve3(mainPts, false, 'centripetal');
 
@@ -105,8 +122,8 @@ export function build(ctx) {
   };
   // half width across the face / half thickness
   // concept art: thick, broad BLADES (not wires) with a heavy bevel
-  const mainW = keys([[0, 0.006], [0.04, 0.026], [0.13, 0.038], [0.25, 0.09], [0.46, 0.116], [0.66, 0.11], [0.84, 0.08], [0.95, 0.04], [1, 0.004]]);
-  const mainH = keys([[0, 0.008], [0.05, 0.02], [0.18, 0.026], [0.32, 0.036], [0.72, 0.034], [0.91, 0.024], [1, 0.005]]);
+  const mainW = keys([[0, 0.008], [0.06, 0.045], [0.15, 0.07], [0.25, 0.09], [0.46, 0.116], [0.66, 0.11], [0.84, 0.08], [0.95, 0.04], [1, 0.004]]);
+  const mainH = keys([[0, 0.006], [0.05, 0.02], [0.18, 0.028], [0.32, 0.036], [0.72, 0.034], [0.91, 0.024], [1, 0.005]]);
 
   /** Lens / blade section with chamfered bevels (CCW, x across, y face). */
   const lens = (Wf, Hf) => (t) => {
@@ -161,54 +178,48 @@ export function build(ctx) {
   // polished outer bevel strip
   const edgeGeo = rideStrip(0.06, 0.93, 0.8, 0.55, geo.roundedSection(0.005, 0.004, 2, 8), 90, (s) => 0.5 + 0.5 * Math.sin(Math.PI * s));
 
-  // ------------------------------------------------- root socket / knuckle
-  // round 6: the blade is carried by a bracket on the side of the skull
-  // BEHIND the turbine (sculpt), not from the upper cranium. ROOT = new hinge.
-  const ROOT_U = 1.62, ROOT_Y = 1.0;
-  const skullP = anatomy.headSurface(ROOT_U, ROOT_Y, V(0, 0, 0));
-  const skullN = anatomy.headNormal(ROOT_U, ROOT_Y, V(0, 0, 0));
+  // ------------------------------------------------- root (flush skull mount)
+  // round 8: no strut. The blade's top end dives into the skull; the pivot
+  // (flare / sweep hinge) sits where it enters the shell.
   const skullLocal = toLocal(skullP);
-  const knuckleC = skullLocal.clone().addScaledVector(skullN, 0.035);
+  const knuckleC = skullLocal.clone();
 
   // ------------------------------------------------------- inner blade
-  // connector from the root knuckle on the cranium side, standing off the
-  // skull, down and out to merge into the inner edge of the main blade.
-  const T_MERGE = 0.43;
-  const mf = frameAt(mainCurve, mainUp, T_MERGE);
-  const mergeP = mf.P.clone().addScaledVector(mf.B, inwardSign(T_MERGE) * mainW(T_MERGE) * 0.6);
-  const innerCurve = new THREE.CatmullRomCurve3([
-    knuckleC.clone(),
-    knuckleC.clone().lerp(mergeP, 0.5).addScaledVector(skullN, 0.04),
-    mergeP,
-  ], false, 'centripetal');
-  // round 6: a broad bracket plate (not a rod) carrying the blade off the skull
-  // tall plate (vertical extent) so it never reads as a strut / antenna from the front
-  const innerW = keys([[0, 0.075], [0.2, 0.065], [0.6, 0.058], [0.9, 0.055], [1, 0.055]]); // round 7: slimmer (front view read as a bar)
-  const innerH = keys([[0, 0.03], [0.5, 0.026], [1, 0.024]]);
+  // concept art "double blade": a thinner blade running parallel just inside
+  // and BEHIND the main blade's upper half (hidden behind it from the front),
+  // rooted next to the main root and merging into the blade at T_MERGE.
+  const T_IN0 = 0.1, T_MERGE = 0.45;
+  const innerPts = [];
+  for (let i = 0; i <= 12; i++) {
+    const t = T_IN0 + ((T_MERGE - T_IN0) * i) / 12;
+    const f = frameAt(mainCurve, mainUp, t);
+    const k = i / 12;
+    const off = (1 - S(k, 0.55, 1)) * (mainW(t) * 0.55 + 0.02);
+    const back = 0.03 + 0.03 * Math.sin(Math.PI * Math.min(1, k * 1.2));
+    innerPts.push(f.P.clone().addScaledVector(f.B, inwardSign(t) * off).addScaledVector(f.Nf, -back * (1 - S(k, 0.7, 1) * 0.6)));
+  }
+  const innerCurve = new THREE.CatmullRomCurve3(innerPts, false, 'centripetal');
+  const innerW = keys([[0, 0.05], [0.25, 0.05], [0.7, 0.04], [1, 0.02]]);
+  const innerH = keys([[0, 0.02], [0.6, 0.018], [1, 0.01]]);
   const innerGeo = geo.sweptSection(innerCurve, lens(innerW, innerH), {
-    steps: 40, up: () => V(0, 0.25, 1).normalize(), creaseAngle: deg(24),
+    steps: 50, up: (t) => mainUp(T_IN0 + (T_MERGE - T_IN0) * t), creaseAngle: deg(24),
   });
-  const innerRoot = knuckleC.clone();
+  const innerRoot = innerPts[0].clone();
 
-  // ------------------------------------------------- clamp bracket (merge)
-  const clampCurve = new THREE.CatmullRomCurve3([0.4, 0.42, 0.44, 0.46].map((t) => mainCurve.getPointAt(t)));
-  const armGeo = geo.sweptSection(clampCurve, (t) => {
-    const W = mainW(T_MERGE) + 0.008, H = mainH(T_MERGE) + 0.007;
-    const b = 0.01;
-    return [[W, 0], [W - b * 0.4, H * 0.7], [W - b, H], [-W + b, H], [-W + b * 0.4, H * 0.7], [-W, 0], [-W + b * 0.4, -H * 0.7], [-W + b, -H], [W - b, -H], [W - b * 0.4, -H * 0.7]];
-  }, { steps: 12, up: (t) => mainUp(0.4 + t * 0.06), creaseAngle: deg(30) });
 
-  const knuckleGeo = new THREE.SphereGeometry(0.055, 24, 16);
-  knuckleGeo.translate(knuckleC.x, knuckleC.y, knuckleC.z);
+  // low seat ring where the blade enters the skull (flush, not a ball)
+  const knuckleGeo = geo.ringStack([
+    [0.03, -0.01], [0.06, 0.008], [0.07, 0.004], [0.074, -0.03],
+  ], 40);
   const collarGeo = geo.ringStack([
-    [0.04, -0.04], [0.04, 0.012], [0.046, 0.024], [0.062, 0.03], [0.078, 0.022], [0.088, 0.004], [0.092, -0.05],
+    [0.075, -0.03], [0.075, 0.0], [0.082, 0.006], [0.1, 0.007], [0.112, 0.002], [0.116, -0.03],
   ], 48);
   const boltParts = [];
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2 + 0.3;
     const bg = new THREE.CylinderGeometry(0.0065, 0.0065, 0.01, 10);
     bg.rotateX(Math.PI / 2);
-    bg.translate(Math.cos(a) * 0.07, Math.sin(a) * 0.07, 0.027);
+    bg.translate(Math.cos(a) * 0.095, Math.sin(a) * 0.095, 0.006);
     boltParts.push(bg.toNonIndexed());
     bg.dispose();
   }
@@ -242,8 +253,10 @@ export function build(ctx) {
     body.name = `fins.body.${key}`;
     body.position.copy(sx(knuckleC)).negate();
     pivot.add(body);
-    body.add(ctx.mesh(Gm(knuckleGeo), knuckleMat, `fins.knuckle.${key}`));
-    body.add(ctx.mesh(Gm(armGeo), bracketMat, `fins.bracket.${key}`));
+    const seat = ctx.mesh(Gm(knuckleGeo), knuckleMat, `fins.knuckle.${key}`);
+    seat.position.copy(sx(knuckleC));
+    geo.faceDirection(seat, sx(skullN));
+    body.add(seat);
     body.add(ctx.mesh(Gm(bladeGeo), bladeMat, `fins.blade.${key}`));
     body.add(ctx.mesh(Gm(ridgeGeo), ridgeMat, `fins.ridge.${key}`));
     body.add(ctx.mesh(Gm(edgeGeo), edgeMat, `fins.edge.${key}`));
