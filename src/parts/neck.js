@@ -425,7 +425,8 @@ export function build(ctx) {
   }
 
   // ---------------------------------------------------------------- nape
-  const napeRows = [[0.3, 0.52], [0.54, 0.76], [0.78, 1.0], [1.02, 1.24], [1.26, 1.48], [1.5, 1.72]];
+  // (top row at body y 1.5-1.72 removed in round 7: the shorter skull back no longer covers it)
+  const napeRows = [[0.3, 0.52], [0.54, 0.76], [0.78, 1.0], [1.02, 1.24], [1.26, 1.48]];
   napeRows.forEach(([y0, y1], r) => {
     const onHead = y0 > 1.0;
     const surf = onHead ? sockSurf : coreSurf;
