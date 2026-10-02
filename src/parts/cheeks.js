@@ -44,8 +44,8 @@ export function build(ctx) {
   // LOCAL hub / normal override (face close-up: turbine lower + further out,
   // seen nearly edge-on from the front). Requested core values:
   //   JOINTS.cheekL.pos = HUB, LANDMARKS.cheekDiscNormalL = NRM (CUTOUTS follow).
-  const HUB = [0.48, 0.38, 0.52];
-  const NRM = [0.92, -0.05, 0.39];
+  const HUB = [0.5, 0.4, 0.47]; // round 6: back + up (3D sculpt side view)
+  const NRM = [0.93, -0.05, 0.36];
   const JNT = new THREE.Vector3().fromArray(LM.cheekDiscL);
   const C = new THREE.Vector3().fromArray(HUB);
   const N = new THREE.Vector3().fromArray(NRM).normalize();
@@ -251,9 +251,12 @@ export function build(ctx) {
   const band2Mat = M.get('chrome', { roughness: 0.27, color: 0xa9b0b7, panel: 5, seed: 47, lineWidth: 0.0035 });
   const jowlMat = M.get('chrome', { roughness: 0.26, color: 0xb2b8bf, panel: 6.5, seed: 49, lineWidth: 0.0035 });
   const stepMat = M.get('gunmetal', { roughness: 0.34, color: 0x5a6068, panel: 14, seed: 53, lineWidth: 0.004 });
-  const ringMat = M.get('gunmetal', { roughness: 0.34, color: 0x737a82, panel: 14, seed: 54, lineWidth: 0.004 }); // round 5: bold metal rings, not a dark tunnel
+  const ringMat = M.get('gunmetal', { roughness: 0.34, color: 0x737a82, panel: 14, seed: 54, lineWidth: 0.004 });
+  // round 6: the stepped rings read as lit metal treads (sculpt), not a black tunnel
+  const treadMat = M.get('chrome', { roughness: 0.3, color: 0x9aa1a8, panel: 12, seed: 55, lineWidth: 0.0035 });
+  treadMat.envMapIntensity = 1.6; // round 5: bold metal rings, not a dark tunnel
   const plateMat = M.get('darkMetal', { roughness: 0.4, color: 0x34383d, panel: 18, seed: 57, lineWidth: 0.0025 });
-  const vaneMat = M.get('gunmetal', { roughness: 0.32, color: 0x5c626a });
+  const vaneMat = M.get('gunmetal', { roughness: 0.3, color: 0x80878f });
   const floorMat = M.get('gunmetal', { roughness: 0.3, color: 0x7c838b, panel: 16, seed: 58, lineWidth: 0.003 });
   const darkMat = M.get('darkMetal');
   const cavityMat = M.get('cavity');
@@ -291,21 +294,21 @@ export function build(ctx) {
   const rimLow = (th) => { const a = wrapA(th); return SS(-a, deg(45), deg(75)) * SS(a + Math.PI, deg(5), deg(30)); };
   const rimTop = (th, r) => rimTop0(th, r) - 0.03 * rimLow(th);
   // open at the lower front: there band1 + the tile fan form the cavity lip (close-up)
-  const rimGeo = polarSweep({ th0: deg(-78), th1: deg(208), ends: [0.06, 0.06], rc: RIM_RC, hw: RIM_HW, top: rimTop, bottom: bottomFn, corner: 0.013, crown: 0.004, segs: 108 });
+  const rimGeo = polarSweep({ th0: deg(-78), th1: deg(208), ends: [0.06, 0.06], rc: RIM_RC, hw: RIM_HW, top: rimTop, bottom: bottomFn, corner: 0.013, crown: 0.004, segs: 84 });
 
   // band1: inner C, curls under the disc and in to just outside the mouth corner
   const B1_HW = 0.046;
   // band1 hugs the turbine all the way under it (fills between rim and U plates)
   const B1_RC = spiral(0.373, 0.36, deg(-80), deg(-110));
   const b1Top = topFn(0.06, 0.08, 0.02, 1);
-  const band1Geo = polarSweep({ th0: deg(-128), th1: deg(116), rc: B1_RC, hw: B1_HW, top: b1Top, bottom: bottomFn, corner: 0.013, crown: 0.004, segs: 110, ends: [0.08, 0.12], skirt: deepFront });
+  const band1Geo = polarSweep({ th0: deg(-128), th1: deg(116), rc: B1_RC, hw: B1_HW, top: b1Top, bottom: bottomFn, corner: 0.013, crown: 0.004, segs: 76, ends: [0.08, 0.12], skirt: deepFront });
 
   // band2 + jowl: wrap the back / bottom of the disc, then hand over to a
   // TAIL (swept on the face surface) that runs down and in to the chin.
   const B2_HW = 0.046, B2_END = deg(-82);
   const B2_RC = spiral(0.462, 0.49, deg(-60), B2_END);
   const b2Top = topFn(0.055, 0.08, 0.016);
-  const band2Geo = polarSweep({ th0: B2_END, th1: deg(104), rc: B2_RC, hw: B2_HW, top: b2Top, bottom: bottomFn, corner: 0.013, crown: 0.004, segs: 110, ends: [0, 0.12], skirt: deepFront });
+  const band2Geo = polarSweep({ th0: B2_END, th1: deg(104), rc: B2_RC, hw: B2_HW, top: b2Top, bottom: bottomFn, corner: 0.013, crown: 0.004, segs: 76, ends: [0, 0.12], skirt: deepFront });
 
 
   // ------------------------------------------------------------ lower face (HEAD space, left side)
@@ -325,7 +328,7 @@ export function build(ctx) {
     return s0 - (QK / s0) * (q - QK);
   };
   // chin recedes below the lip carrier (matches jaw.js chinPull)
-  const chinPull = (x, y) => 0.06 * SS(0.12 - y, 0, 0.3) * (0.55 + 0.45 * Math.exp(-Math.pow(x / 0.3, 2)));
+  const chinPull = (x, y) => 0.04 * SS(0.12 - y, 0, 0.3) * (0.55 + 0.45 * Math.exp(-Math.pow(x / 0.3, 2)));
   const jowlZ = (x, y) => {
     const q = Math.abs(x) / (JW - 0.06 * SS(0.3 - y, 0, 0.5));
     return JZC + JZF * ellZ(q) - 0.06 * SS(0.1 - y, 0, 0.35);
@@ -461,7 +464,7 @@ export function build(ctx) {
     // rounded crown across the band
     return lowPt(x, y, 0.03 + 0.016 * Math.sin(Math.PI * a), t);
   };
-  const sideBandGeo = lowPlate(sbS, { thickness: 0.07, bevel: 0.016, segU: 14, segV: 40 });
+  const sideBandGeo = lowPlate(sbS, { thickness: 0.07, bevel: 0.016, segU: 12, segV: 30 });
   // polished rail along its outer edge (borders the turbine)
   const railPts = [];
   for (let i = 0; i <= 10; i++) { const y = THREE.MathUtils.lerp(SB_Y0 + 0.03, SB_Y1 - 0.02, i / 10); railPts.push([outerX(y) + 0.012, y, 0.055]); }
@@ -489,7 +492,7 @@ export function build(ctx) {
         // tilt each tile up (outer edge proud) so it catches the top light like the film scales
         return lowPt(FC[0] + r * Math.cos(ph), FC[1] + r * Math.sin(ph), R.lift + 0.012 * b * Math.max(0, -Math.sin(ph)), t);
       };
-      tileParts.push(lowPlate(S, { thickness: 0.022, bevel: 0.006, gap: 0.0015, segU: 6, segV: 4 }));
+      tileParts.push(lowPlate(S, { thickness: 0.022, bevel: 0.006, gap: 0.0015, segU: 4, segV: 3 }));
       // small dark square socket on the tile (close-up detail)
       if (k % 3 === 1 && R === ROWS[1]) {
         const c = S(0.5, 0.5, new THREE.Vector3());
@@ -510,61 +513,95 @@ export function build(ctx) {
     const ph = deg(THREE.MathUtils.lerp(165, 288, a));
     const r = THREE.MathUtils.lerp(0.035, 0.16, b);
     return lowPt(FC[0] + r * Math.cos(ph) * 1.02, FC[1] + r * Math.sin(ph), 0.004, t);
-  }, { thickness: 0.06, bevel: 0.004, segU: 28, segV: 10 });
+  }, { thickness: 0.06, bevel: 0.004, segU: 22, segV: 8 });
   // outer jowl web under / behind the turbine: closes the gaps between the
   // U bands (3/4 view) without covering the cavity
   const jowlBackGeo = lowPlate((a, b, t) => {
     const ph = deg(THREE.MathUtils.lerp(262, 372, a));
     const r = THREE.MathUtils.lerp(0.17, 0.3, b);
     return lowPt(FC_J[0] + r * Math.cos(ph), FC_J[1] + r * Math.sin(ph), -0.004, t);
-  }, { thickness: 0.08, bevel: 0.006, segU: 30, segV: 8 });
+  }, { thickness: 0.08, bevel: 0.006, segU: 22, segV: 7 });
 
   // red vent slot (concept art) between band2 and the fin, on the back side
   const V0 = deg(-22), V1 = deg(34);
   const ventTop = (th, r) => b2Top(th, r) - 0.03;
   const ventGeo = polarSweep({ th0: V0, th1: V1, rc: 0.528, hw: 0.012, top: ventTop, bottom: bottomFn, corner: 0.004, crown: 0, segs: 40, ends: 0 });
   const ribParts = [];
-  for (let k = 0; k < 18; k++) {
-    const u = V0 + ((k + 0.5) / 18) * (V1 - V0);
+  for (let k = 0; k < 12; k++) {
+    const u = V0 + ((k + 0.5) / 12) * (V1 - V0);
     ribParts.push(polarSweep({ th0: u - 0.012, th1: u + 0.012, rc: 0.528, hw: 0.015, top: (th, r) => ventTop(th, r) + 0.012, bottom: bottomFn, corner: 0.003, crown: 0, segs: 2 }));
   }
   ribParts.push(polarSweep({ th0: V0 - 0.04, th1: V1 + 0.04, rc: 0.546, hw: 0.007, top: (th, r) => b2Top(th, r) - 0.008, bottom: bottomFn, corner: 0.004, crown: 0, segs: 40 }));
   const ventRibGeo = geo.mergeGeometries(ribParts, false);
   ribParts.forEach((g) => g.dispose());
 
+  // round 6 (3D sculpt): densely ribbed strip along the TOP edge of the outer
+  // C band, from behind the disc over the top to under the outer eye corner.
+  const RB0 = deg(36), RB1 = deg(124), RB_HW = 0.024;
+  // runs diagonally in the sculpt: high at the back, dropping toward the eye corner
+  const RB_RC = (th) => 0.535 - 0.05 * SS(th, deg(70), RB1);
+  const ribTop = (th, r) => b2Top(th, r) - 0.012;
+  const ribBaseGeo = polarSweep({ th0: RB0, th1: RB1, rc: RB_RC, hw: RB_HW, top: ribTop, bottom: bottomFn, corner: 0.006, crown: 0.002, segs: 50, ends: [0.05, 0.05] });
+  const fineParts = [];
+  const RIBS = 42;
+  for (let k = 0; k < RIBS; k++) {
+    const u = RB0 + ((k + 0.5) / RIBS) * (RB1 - RB0);
+    const e = Math.min(1, (k + 0.5) / 4, (RIBS - k - 0.5) / 4);
+    fineParts.push(polarSweep({ th0: u - 0.0055, th1: u + 0.0055, rc: RB_RC, hw: RB_HW * (0.6 + 0.3 * e), top: (th, r) => ribTop(th, r) + 0.009, bottom: (th, r) => ribTop(th, r) - 0.004, corner: 0.002, crown: 0.002, segs: 1, skirt: 0.02 }));
+  }
+  const fineRibGeo = geo.mergeGeometries(fineParts, false);
+  fineParts.forEach((g) => g.dispose());
+
+  // round 6 (sculpt): under the disc the inner band reads as two rows of
+  // segmented tiles — dark radial + one circumferential seam cut into band1.
+  const segParts = [];
+  const SEG0 = deg(-126), SEG1 = deg(-28);
+  for (let k = 0; k <= 11; k++) {
+    const u = SEG0 + ((SEG1 - SEG0) * k) / 11;
+    segParts.push(polarSweep({ th0: u - 0.006, th1: u + 0.006, rc: B1_RC, hw: B1_HW * 0.92, top: (th, r) => b1Top(th, r) + 0.003, bottom: (th, r) => b1Top(th, r) - 0.01, corner: 0.002, crown: 0, segs: 1, skirt: 0.02 }));
+  }
+  segParts.push(polarSweep({ th0: SEG0, th1: SEG1, rc: (th) => B1_RC(th) + 0.004, hw: 0.0035, top: (th, r) => b1Top(th, r) + 0.003, bottom: (th, r) => b1Top(th, r) - 0.01, corner: 0.0015, crown: 0, segs: 40, skirt: 0.02 }));
+  const tileSeamGeo = geo.mergeGeometries(segParts, false);
+  segParts.forEach((g) => g.dispose());
+
   // ---------------------------------------------------------- cavity (static)
   const RW = RIM_RC - RIM_HW + 0.003; // cavity wall radius (inside the rim)
-  // round 5: shallow dish (concept: a near-flush disc face, not a tunnel)
-  const Z = { s1: 0.012, s2: 0.0, s3: -0.012, floor: -0.042, plate: -0.022, vane: -0.03 };
+  // round 6 (3D sculpt, side view): a DEEP recessed disc — six concentric
+  // stepped rings descend from the rim to a small flat turbine face + hub.
+  const Z = { s1: 0.006, floor: -0.118, plate: -0.098, vane: -0.106 };
+  const STEP_N = 6, STEP_R1 = 0.135, STEP_DZ = (Z.s1 - (Z.floor + 0.012)) / STEP_N;
   const wallGeo = polarLathe([
-    { r: RW, z: Z.s1 - 0.14 },
+    { r: RW, z: Z.s1 - 0.03 },
     { r: RW, f: (th, r) => rimTop(th, r) - 0.012 },
   ], 128, inDir);
-  const stepsGeo = polarLathe([
-    { r: 0.2, z: Z.floor - 0.01 },
-    { r: 0.2, z: Z.s3 - 0.004 }, { r: 0.204, z: Z.s3 },
-    { r: 0.222, z: Z.s3 }, { r: 0.222, z: Z.s2 - 0.004 }, { r: 0.226, z: Z.s2 },
-    { r: 0.24, z: Z.s2 }, { r: 0.24, z: Z.s1 - 0.004 }, { r: 0.244, z: Z.s1 },
-    { r: RW + 0.002, z: Z.s1 },
-  ].reverse(), 128);
+  const stepProf = [{ r: RW + 0.002, z: Z.s1 }];
+  for (let i = 0; i < STEP_N; i++) {
+    const rOut = RW - ((RW - STEP_R1) * i) / STEP_N;
+    const rIn = RW - ((RW - STEP_R1) * (i + 1)) / STEP_N;
+    const z = Z.s1 - STEP_DZ * i;
+    // flat tread with a rounded nose, then a vertical riser down to the next tread
+    stepProf.push({ r: rIn + 0.006, z }, { r: rIn + 0.0015, z: z - 0.002 }, { r: rIn, z: z - 0.006 }, { r: rIn, z: z - STEP_DZ });
+  }
+  stepProf.push({ r: STEP_R1 - 0.004, z: Z.floor - 0.006 });
+  const stepsGeo = polarLathe(stepProf, 96);
 
   // ------------------------------------------------------------ rotor
   // flat turbine face with concentric stepped grooves (concept: speaker-like rings)
   const floorGeo = polarLathe([
-    { r: 0.205, z: Z.floor }, { r: 0.17, z: Z.floor }, { r: 0.166, z: Z.floor + 0.006 }, { r: 0.14, z: Z.floor + 0.006 },
-    { r: 0.136, z: Z.floor + 0.012 }, { r: 0.11, z: Z.floor + 0.012 }, { r: 0.106, z: Z.floor + 0.018 }, { r: 0.0, z: Z.floor + 0.018 },
+    { r: STEP_R1, z: Z.floor }, { r: 0.112, z: Z.floor }, { r: 0.108, z: Z.floor + 0.005 }, { r: 0.09, z: Z.floor + 0.005 },
+    { r: 0.086, z: Z.floor + 0.01 }, { r: 0.0, z: Z.floor + 0.01 },
   ], 96);
   // small dark hub disc (the swirl vanes fill the rest of the cavity)
   const plateGeo = polarLathe([
-    { r: 0.082, z: Z.floor }, { r: 0.082, z: Z.plate - 0.012 }, { r: 0.078, z: Z.plate - 0.004 },
-    { r: 0.072, z: Z.plate }, { r: 0.05, z: Z.plate + 0.002 }, { r: 0.046, z: Z.plate - 0.004 },
+    { r: 0.064, z: Z.floor }, { r: 0.064, z: Z.plate - 0.01 }, { r: 0.06, z: Z.plate - 0.003 },
+    { r: 0.055, z: Z.plate }, { r: 0.04, z: Z.plate + 0.002 }, { r: 0.037, z: Z.plate - 0.004 },
   ], 72);
   // radial spoke grooves on the inner plate
   const spokeParts = [];
   for (let k = 0; k < 6; k++) {
     const a = (k / 6) * Math.PI * 2 + 0.3;
     const b = new THREE.BoxGeometry(0.022, 0.004, 0.004);
-    b.translate(0.061, 0, Z.plate + 0.0012);
+    b.translate(0.048, 0, Z.plate + 0.0012);
     b.rotateZ(a);
     spokeParts.push(b.toNonIndexed());
     b.dispose();
@@ -575,8 +612,8 @@ export function build(ctx) {
 
   // turbine vane: thin, slightly swept blade built in its own frame so the
   // iris param can pitch it about its radial axis.
-  const VANES = 18;
-  const vR0 = 0.1, vR1 = 0.165, vSweep = 0.32, vH = 0.012;
+  const VANES = 14;
+  const vR0 = 0.07, vR1 = 0.128, vSweep = 0.12, vH = 0.01;
   const vanePts = [];
   for (let i = 0; i <= 8; i++) {
     const s = i / 8;
@@ -590,7 +627,7 @@ export function build(ctx) {
 
   // ------------------------------------------------------------- hub
   const collarGeo = polarLathe([
-    { r: 0.046, z: Z.plate - 0.004 }, { r: 0.046, z: -0.03 }, { r: 0.042, z: -0.024 },
+    { r: 0.046, z: -0.05 }, { r: 0.046, z: -0.03 }, { r: 0.042, z: -0.024 },
     { r: 0.033, z: -0.024 }, { r: 0.031, z: -0.03 },
   ], 48);
   const capGeo = polarLathe([
@@ -651,6 +688,9 @@ export function build(ctx) {
     add(headSp, tileDarkGeo, cavityMat, `cheeks.scaleSockets.${key}`);
     add(frame, ventGeo, ventMat, `cheeks.vent.${key}`);
     add(frame, ventRibGeo, darkMat, `cheeks.ventRibs.${key}`);
+    add(frame, ribBaseGeo, band2Mat, `cheeks.ribBand.${key}`);
+    add(frame, fineRibGeo, rimMat, `cheeks.ribs.${key}`);
+    add(frame, tileSeamGeo, darkMat, `cheeks.band1.seams.${key}`);
     add(frame, wallGeo, ringMat, `cheeks.wall.${key}`);
 
     const stack = new THREE.Group();
@@ -659,10 +699,10 @@ export function build(ctx) {
     // tilt the dish toward the skull's high (upper-back) side so the turbine
     // face sits near-flush all round instead of reading as a deep tunnel
     {
-      const phi = deg(72), tilt = deg(22);
+      const phi = deg(72), tilt = deg(9);
       stack.quaternion.setFromAxisAngle(new THREE.Vector3(-Math.sin(phi), Math.cos(phi), 0), -tilt);
     }
-    add(stack, stepsGeo, ringMat, `cheeks.steps.${key}`);
+    add(stack, stepsGeo, treadMat, `cheeks.steps.${key}`);
     const rotor = new THREE.Group();
     rotor.name = `cheeks.rotor.${key}`;
     stack.add(rotor);
@@ -683,6 +723,7 @@ export function build(ctx) {
     sides[key] = { side, stack, rotor, hub, vanes };
   }
 
+  const HUB_Z = Z.plate + 0.03; // hub collar/cap authored around z -0.02 -> stands proud of the plate
   let phase = 0;
   const params = { spin: 0, spinSpeed: 0.15, iris: 0.5, pulse: 0, recess: 0 };
   const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
@@ -724,7 +765,7 @@ export function build(ctx) {
     for (const s of Object.values(sides)) {
       s.rotor.rotation.z = s.side * (p.spin + phase);
       writeVanes(s, THREE.MathUtils.lerp(1.1, 0.0, THREE.MathUtils.clamp(p.iris, 0, 1)));
-      s.hub.position.z = -0.004 + p.pulse * 0.04;
+      s.hub.position.z = HUB_Z + p.pulse * 0.04;
       s.stack.position.z = -p.recess * 0.05;
     }
     glowMat.emissiveIntensity = 0.55 + 1.6 * THREE.MathUtils.clamp(p.pulse, 0, 1);
