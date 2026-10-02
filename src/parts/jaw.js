@@ -117,7 +117,7 @@ export function build(ctx) {
   /** front-projected point on the muzzle at (x, y) with extra offset n along +Z-ish normal */
   // round 5: the chin recedes below the lip carrier (3/4 concept: chin button
   // sits well behind the mouth, LANDMARKS.chinButton z 0.7). Same term in cheeks.js.
-  const chinPull = (x, y) => 0.06 * sstep(0.12 - y, 0, 0.3) * (0.55 + 0.45 * Math.exp(-Math.pow(x / 0.3, 2)));
+  const chinPull = (x, y) => 0.04 * sstep(0.12 - y, 0, 0.3) * (0.55 + 0.45 * Math.exp(-Math.pow(x / 0.3, 2)));
   const muzZ = (x, y) => {
     const z = headFrontZ(x, y);
     if (z == null) {
@@ -232,13 +232,15 @@ export function build(ctx) {
     spine.getTangentAt(clamp(b, 0, 1), _tg);
     return { z: _sp.x, y: _sp.y, nz: _tg.y, ny: -_tg.x };
   };
-  const chinW = (b) => lerp(0.1, 0.19, sstep(b, 0.05, 0.75)) + 0.03 * sstep(b, 0.7, 1);
+  // round 6 (sculpt): a fuller, rounder chin mass
+  const chinW = (b) => lerp(0.12, 0.21, sstep(b, 0.05, 0.7)) + 0.03 * sstep(b, 0.7, 1);
   const makeChin = (wScale, sink) => (a, b, t) => {
     const f = spineFrame(b);
     const w = chinW(b) * wScale;
     const x = a * w;
     // rounded cross-section: the sides fall back
-    const drop = (1 - Math.sqrt(Math.max(0, 1 - a * a * 0.92))) * (0.03 + 0.08 * w);
+    // round 6 (sculpt): a ROUND chin mass — the sides wrap back like a cylinder
+    const drop = (1 - Math.sqrt(Math.max(0, 1 - a * a * 0.95))) * (0.03 + 0.42 * w);
     return t.set(x, f.y - f.ny * (drop + sink), f.z - f.nz * (drop + sink));
   };
   const chinOut = (a, b) => { const f = spineFrame(b); return new V3(a * 0.6, f.ny, f.nz).normalize(); };

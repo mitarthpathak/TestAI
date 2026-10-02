@@ -57,14 +57,18 @@ export function build(ctx) {
     // round 5: the whole C leans FORWARD (concept 3/4 + film front: a thick
     // blade hugging the outside of the turbine, hook reaching toward the
     // mouth); x (front ( ) outline) unchanged. Top = free spike.
-    V(0.79, 1.52, -0.02),
-    V(0.94, 1.32, 0.1),
-    V(1.04, 1.07, 0.24),
-    V(1.09, 0.8, 0.36),
-    V(1.06, 0.55, 0.46),
-    V(0.99, 0.34, 0.52),
-    V(0.9, 0.19, 0.58),
-    V(0.79, 0.1, 0.63),
+    // round 6 (3D sculpt, side view): the blade sits well BEHIND the turbine —
+    // free top just above eye level, outer curve round the back of the disc,
+    // lower end low and forward under the turbine near the jaw. x (front ( )
+    // outline, max ~1.09 at y ~0.75) unchanged.
+    V(0.92, 1.21, 0.18),
+    V(1.04, 1.05, 0.17),
+    V(1.09, 0.86, 0.13),
+    V(1.09, 0.66, 0.12),
+    V(1.04, 0.47, 0.16),
+    V(0.95, 0.33, 0.29),
+    V(0.85, 0.25, 0.39),
+    V(0.77, 0.21, 0.45),
 ].map(toLocal);
   const mainCurve = new THREE.CatmullRomCurve3(mainPts, false, 'centripetal');
 
@@ -152,40 +156,42 @@ export function build(ctx) {
   const edgeGeo = rideStrip(0.06, 0.93, 0.8, 0.55, geo.roundedSection(0.005, 0.004, 2, 8), 90, (s) => 0.5 + 0.5 * Math.sin(Math.PI * s));
 
   // ------------------------------------------------- root socket / knuckle
-  const uJ = anatomy.headAngleForX(J.x, J.y);
-  const skullP = anatomy.headSurface(uJ, J.y, V(0, 0, 0));
-  const skullN = anatomy.headNormal(uJ, J.y, V(0, 0, 0));
+  // round 6: the blade is carried by a bracket on the side of the skull
+  // BEHIND the turbine (sculpt), not from the upper cranium. ROOT = new hinge.
+  const ROOT_U = 1.62, ROOT_Y = 1.0;
+  const skullP = anatomy.headSurface(ROOT_U, ROOT_Y, V(0, 0, 0));
+  const skullN = anatomy.headNormal(ROOT_U, ROOT_Y, V(0, 0, 0));
   const skullLocal = toLocal(skullP);
   const knuckleC = skullLocal.clone().addScaledVector(skullN, 0.035);
 
   // ------------------------------------------------------- inner blade
   // connector from the root knuckle on the cranium side, standing off the
   // skull, down and out to merge into the inner edge of the main blade.
-  const T_MERGE = 0.24;
+  const T_MERGE = 0.3;
   const mf = frameAt(mainCurve, mainUp, T_MERGE);
   const mergeP = mf.P.clone().addScaledVector(mf.B, inwardSign(T_MERGE) * mainW(T_MERGE) * 0.6);
   const innerCurve = new THREE.CatmullRomCurve3([
     knuckleC.clone(),
-    toLocal(V(0.75, 1.5, -0.05)),
-    toLocal(V(0.88, 1.35, 0.05)),
+    knuckleC.clone().lerp(mergeP, 0.5).addScaledVector(skullN, 0.04),
     mergeP,
   ], false, 'centripetal');
-  const innerW = keys([[0, 0.022], [0.15, 0.03], [0.6, 0.032], [0.9, 0.03], [1, 0.022]]);
-  const innerH = keys([[0, 0.016], [0.5, 0.017], [1, 0.014]]);
+  // round 6: a broad bracket plate (not a rod) carrying the blade off the skull
+  const innerW = keys([[0, 0.06], [0.2, 0.055], [0.6, 0.052], [0.9, 0.06], [1, 0.07]]);
+  const innerH = keys([[0, 0.022], [0.5, 0.02], [1, 0.02]]);
   const innerGeo = geo.sweptSection(innerCurve, lens(innerW, innerH), {
-    steps: 60, up: faceUp(innerCurve, 0.35), creaseAngle: deg(24),
+    steps: 40, up: () => V(0, 0.25, 1).normalize(), creaseAngle: deg(24),
   });
   const innerRoot = knuckleC.clone();
 
   // ------------------------------------------------- clamp bracket (merge)
-  const clampCurve = new THREE.CatmullRomCurve3([0.21, 0.23, 0.25, 0.27].map((t) => mainCurve.getPointAt(t)));
+  const clampCurve = new THREE.CatmullRomCurve3([0.27, 0.29, 0.31, 0.33].map((t) => mainCurve.getPointAt(t)));
   const armGeo = geo.sweptSection(clampCurve, (t) => {
-    const W = mainW(0.24) + 0.008, H = mainH(0.24) + 0.007;
+    const W = mainW(0.3) + 0.008, H = mainH(0.3) + 0.007;
     const b = 0.01;
     return [[W, 0], [W - b * 0.4, H * 0.7], [W - b, H], [-W + b, H], [-W + b * 0.4, H * 0.7], [-W, 0], [-W + b * 0.4, -H * 0.7], [-W + b, -H], [W - b, -H], [W - b * 0.4, -H * 0.7]];
-  }, { steps: 12, up: (t) => mainUp(0.21 + t * 0.06), creaseAngle: deg(30) });
+  }, { steps: 12, up: (t) => mainUp(0.27 + t * 0.06), creaseAngle: deg(30) });
 
-  const knuckleGeo = new THREE.SphereGeometry(0.045, 24, 16);
+  const knuckleGeo = new THREE.SphereGeometry(0.055, 24, 16);
   knuckleGeo.translate(knuckleC.x, knuckleC.y, knuckleC.z);
   const collarGeo = geo.ringStack([
     [0.04, -0.04], [0.04, 0.012], [0.046, 0.024], [0.062, 0.03], [0.078, 0.022], [0.088, 0.004], [0.092, -0.05],
@@ -219,20 +225,27 @@ export function build(ctx) {
     socket.add(ctx.mesh(boltGeo, darkMat, `fins.bolts.${key}`));
     space.add(socket);
 
+    // pivot sits at the new root knuckle; the blade body is offset back so it
+    // is authored in joint-local space (flare / sweep hinge on the bracket)
     const pivot = new THREE.Group();
     pivot.name = `fins.pivot.${key}`;
+    pivot.position.copy(sx(knuckleC));
     space.add(pivot);
-    pivot.add(ctx.mesh(Gm(knuckleGeo), knuckleMat, `fins.knuckle.${key}`));
-    pivot.add(ctx.mesh(Gm(armGeo), bracketMat, `fins.bracket.${key}`));
-    pivot.add(ctx.mesh(Gm(bladeGeo), bladeMat, `fins.blade.${key}`));
-    pivot.add(ctx.mesh(Gm(ridgeGeo), ridgeMat, `fins.ridge.${key}`));
-    pivot.add(ctx.mesh(Gm(edgeGeo), edgeMat, `fins.edge.${key}`));
-    pivot.add(ctx.mesh(Gm(grooveGeo), darkMat, `fins.groove.${key}`));
+    const body = new THREE.Group();
+    body.name = `fins.body.${key}`;
+    body.position.copy(sx(knuckleC)).negate();
+    pivot.add(body);
+    body.add(ctx.mesh(Gm(knuckleGeo), knuckleMat, `fins.knuckle.${key}`));
+    body.add(ctx.mesh(Gm(armGeo), bracketMat, `fins.bracket.${key}`));
+    body.add(ctx.mesh(Gm(bladeGeo), bladeMat, `fins.blade.${key}`));
+    body.add(ctx.mesh(Gm(ridgeGeo), ridgeMat, `fins.ridge.${key}`));
+    body.add(ctx.mesh(Gm(edgeGeo), edgeMat, `fins.edge.${key}`));
+    body.add(ctx.mesh(Gm(grooveGeo), darkMat, `fins.groove.${key}`));
 
     const innerPivot = new THREE.Group();
     innerPivot.name = `fins.innerPivot.${key}`;
     innerPivot.position.copy(sx(innerRoot));
-    pivot.add(innerPivot);
+    body.add(innerPivot);
     const inner = ctx.mesh(Gm(innerGeo), innerMat, `fins.inner.${key}`);
     inner.position.copy(sx(innerRoot)).negate();
     innerPivot.add(inner);
