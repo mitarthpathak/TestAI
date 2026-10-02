@@ -44,7 +44,7 @@ export function build(ctx) {
   const mat = {
     column: M.get('chrome', { color: 0xc2c8ce, roughness: 0.22, panel: 7, seed: 61, lineWidth: 0.003, lineDepth: 0.7 }),
     carrier: M.get('chrome', { color: 0xa8aeb5, roughness: 0.22, panel: 8, seed: 69, lineWidth: 0.003, lineDepth: 0.6 }),
-    chin: M.get('chrome', { color: 0xb4bac1, roughness: 0.24, panel: 5, seed: 67, lineWidth: 0.0035, lineDepth: 0.7 }),
+    chin: M.get('chrome', { color: 0xc0c6cc, roughness: 0.24, panel: 5, seed: 67, lineWidth: 0.0035, lineDepth: 0.7 }),
     muzzle: M.get('chrome', { color: 0xb8bec5, roughness: 0.26, panel: 6.5, seed: 62, lineWidth: 0.0035 }),
     sideA: M.get('chrome', { color: 0xadb4bb, roughness: 0.3, panel: 6, seed: 63, lineWidth: 0.0035 }),
     sideB: M.get('chrome', { roughness: 0.42, color: 0x868d95, panel: 5.5, seed: 64, lineWidth: 0.0035 }),
@@ -58,7 +58,7 @@ export function build(ctx) {
     cavity: M.get('cavity'),
   };
   // close-up reference: light polished steel on the lower face
-  for (const k of ['column', 'carrier', 'chin', 'muzzle', 'sideA', 'sideB', 'sideC', 'base']) { mat[k].envMapIntensity = 1.8; mat[k].roughness = Math.max(mat[k].roughness, 0.34); }
+  for (const k of ['column', 'carrier', 'chin', 'muzzle', 'sideA', 'sideB', 'sideC', 'base']) { mat[k].envMapIntensity = 2.0; mat[k].roughness = Math.max(mat[k].roughness, 0.34); }
 
   // ------------------------------------------------------------ shared helpers
   const _t = new V3();
@@ -147,8 +147,8 @@ export function build(ctx) {
 
   // ------------------------------------------------------------ lower-lip carrier
   // wide horizontal plate directly under the lower lip (the lips sit on it)
-  const CARRIER_TOP = MOUTH_Y - 0.02;
-  const CARRIER_BOT = MOUTH_Y - 0.1;
+  const CARRIER_TOP = MOUTH_Y - 0.06; // round 7: sits under the thicker lower lip
+  const CARRIER_BOT = MOUTH_Y - 0.115;
   {
     const xHalf = (y) => lerp(0.12, 0.15, sstep(y, CARRIER_BOT, CARRIER_TOP));
     const S = (a, b, t) => {
@@ -194,7 +194,7 @@ export function build(ctx) {
 
   // ------------------------------------------------------------ flanking muzzle plates (mouth corner -> chin)
   {
-    const yb = -0.24, yt = CARRIER_BOT + 0.03;
+    const yb = -0.07, yt = CARRIER_BOT + 0.03; // round 7: the chin mass takes over below
     const xIn = (y) => colW(y) + 0.004;
     const xOut = (y) => lerp(0.13, 0.215, sstep(y, yb - 0.04, yt));
     const mk = (lift) => (a, b, t) => {
@@ -222,8 +222,13 @@ export function build(ctx) {
   // spine in the (y, z) plane: from just below the column down and under the head
   // the front follows the muzzle surface (flush with the column), then curls under
   const spinePts = [];
-  for (const y of [-0.03, -0.09, -0.15, -0.21]) spinePts.push([y, muzZ(0, y) + 0.016]);
-  spinePts.push([-0.265, 0.615], [-0.31, 0.565], [-0.342, 0.5], [-0.36, 0.43], [-0.368, 0.36]);
+  // round 7 (sculpt side view): the chin is a big rounded mass that projects
+  // forward below the column (the U bands end against its sides)
+  // the front follows CHIN_BALL (same ball as cheeks.js lowZ)
+  const CHIN_BALL = [0, -0.1, 0.42, 0.37];
+  const ballZ = (y) => CHIN_BALL[2] + Math.sqrt(Math.max(0, CHIN_BALL[3] ** 2 - (y - CHIN_BALL[1]) ** 2));
+  for (const y of [-0.03, -0.09, -0.15, -0.21]) spinePts.push([y, Math.max(muzZ(0, y) + 0.016, ballZ(y) + 0.012)]);
+  spinePts.push([-0.27, 0.76], [-0.315, 0.7], [-0.345, 0.62], [-0.362, 0.53], [-0.37, 0.44], [-0.372, 0.37]);
   spinePts.reverse();
   const spine = new THREE.SplineCurve(spinePts.map(([y, z]) => new THREE.Vector2(z, y)));
   const _sp = new THREE.Vector2(), _tg = new THREE.Vector2();
@@ -233,7 +238,7 @@ export function build(ctx) {
     return { z: _sp.x, y: _sp.y, nz: _tg.y, ny: -_tg.x };
   };
   // round 6 (sculpt): a fuller, rounder chin mass
-  const chinW = (b) => lerp(0.12, 0.21, sstep(b, 0.05, 0.7)) + 0.03 * sstep(b, 0.7, 1);
+  const chinW = (b) => lerp(0.14, 0.225, sstep(b, 0.05, 0.6)) + 0.02 * sstep(b, 0.7, 1);
   const makeChin = (wScale, sink) => (a, b, t) => {
     const f = spineFrame(b);
     const w = chinW(b) * wScale;
@@ -307,7 +312,7 @@ export function build(ctx) {
 
   // ------------------------------------------------------------ jaw sides: layered horizontal bands
   // (u, y) on the head shell. jaw line = lower edge, top = under the cheek rings.
-  const U0 = 0.55, U1 = 1.9;
+  const U0 = 0.85, U1 = 1.9; // round 7: start behind the chin so its sides read
   const tabY = (pts) => {
     const c = new THREE.SplineCurve(pts.map(([u, y]) => new THREE.Vector2(u, y))).getSpacedPoints(120);
     return (u) => {
@@ -353,7 +358,7 @@ export function build(ctx) {
   for (const side of [1, -1]) {
     const pts = [];
     const N = new V3();
-    const ua = 0.5, ub = 2.08;
+    const ua = 0.8, ub = 2.08;
     for (let i = 0; i <= 32; i++) {
       const u = lerp(ua, ub, i / 32);
       const y = jawLineY(u) + 0.006;
