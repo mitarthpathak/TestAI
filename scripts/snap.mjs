@@ -14,6 +14,7 @@
 import { chromium } from 'playwright-core';
 import fs from 'node:fs';
 import path from 'node:path';
+import { LANDMARKS } from '../src/ultron/anatomy.js';
 
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((acc, a, i, arr) => {
@@ -78,7 +79,7 @@ for (const view of views) {
   const file = path.join(outDir, `${view}.png`);
   await page.screenshot({ path: file, timeout: 180000 });
   // projected landmark pixels (used by scripts/overlay.mjs to align with the references)
-  const marks = await page.evaluate(() => {
+  const marks = await page.evaluate((LM) => {
     const S = window.__ULTRON__;
     const out = {};
     const v = new S.camera.position.constructor();
@@ -90,8 +91,16 @@ for (const view of views) {
       v.project(S.camera);
       out[name] = [+((v.x + 1) * 0.5 * w).toFixed(1), +((1 - v.y) * 0.5 * h).toFixed(1)];
     }
+    // head-space landmarks (the head joint sits at the head-space origin)
+    const hj = S.ultron.rig.joints.head;
+    for (const [name, p] of Object.entries(LM)) {
+      v.set(p[0], p[1], p[2]);
+      hj.localToWorld(v);
+      v.project(S.camera);
+      out[name] = [+((v.x + 1) * 0.5 * w).toFixed(1), +((1 - v.y) * 0.5 * h).toFixed(1)];
+    }
     return out;
-  });
+  }, { chin: LANDMARKS.chinButton, crown: LANDMARKS.crownTop, mouth: LANDMARKS.mouthCenter });
   fs.writeFileSync(path.join(outDir, `${view}.json`), JSON.stringify(marks));
   written.push(file);
   console.log(`✓ ${view.padEnd(13)} ${((Date.now() - t1) / 1000).toFixed(1)}s -> ${path.relative(process.cwd(), file)}`);

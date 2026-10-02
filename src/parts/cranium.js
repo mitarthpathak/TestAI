@@ -138,7 +138,7 @@ export function build(ctx) {
     const m = 0.05;
     const cap = geo.surfaceSheet({
       surface: field.surfaceFn, normal: field.normalFn,
-      u0: -Math.PI, u1: Math.PI, y0: 1.06, y1: 1.95, segU: 160, segV: 48, offset: -0.07,
+      u0: -Math.PI, u1: Math.PI, y0: 1.06, y1: 1.95, segU: 120, segV: 40, offset: -0.07,
     });
     root.add(ctx.mesh(cap, core, 'cranium.core'));
     // u at which the shell crosses z = zEdge at height y (front half -> back)
@@ -158,7 +158,7 @@ export function build(ctx) {
     const horseNorm = (s, y, N = new THREE.Vector3()) => field.normalAt(horseSurf(s, y, new THREE.Vector3()), N);
     const sideSheet = geo.surfaceSheet({
       surface: horseSurf, normal: horseNorm,
-      u0: -1, u1: 1, y0: LOW_Y - m, y1: BROW_Y - m + 0.01, segU: 120, segV: 60, offset: -0.07,
+      u0: -1, u1: 1, y0: LOW_Y - m, y1: BROW_Y - m + 0.01, segU: 100, segV: 48, offset: -0.07,
     });
     root.add(ctx.mesh(sideSheet, core, 'cranium.core.sides'));
   }
@@ -226,7 +226,7 @@ export function build(ctx) {
       chart: dome.chart,
       railA: (t) => { const th = crestTh(c0 + (c1 - c0) * t); return [-S0(th), th]; },
       railB: (t) => { const th = crestTh(c0 + (c1 - c0) * t); return [S0(th), th]; },
-      segS: 16, segT: Math.round(120 * (c1 - c0)) + 6, offset: 0.024 - 0.004 * (i % 2), thickness: 0.06, bevel: 0.01,
+      segS: 16, segT: Math.round(96 * (c1 - c0)) + 6, offset: 0.024 - 0.004 * (i % 2), thickness: 0.06, bevel: 0.01,
       gapA: 0, gapB: 0, gap0: i ? 0.005 : 0, gap1: i < 2 ? 0.005 : 0,
       // the forehead segment rises at its front to meet the nose board
       lift: (s, t) => crestLift(s) + (i === 0 ? 0.004 * (1 - THREE.MathUtils.smoothstep(t, 0, 0.35)) : 0),
@@ -266,8 +266,8 @@ export function build(ctx) {
       const lift = o.lift || (() => 0);
       const g = ribbonPlate(THREE, geo, {
         chart: dome.chart, railA: A, railB: B,
-        segS: o.segS ?? 8,
-        segT: Math.max(8, Math.round(lenDeg * 0.45)),
+        segS: o.segS ?? 6,
+        segT: Math.max(8, Math.round(lenDeg * 0.33)),
         offset: off, thickness: o.thickness ?? 0.05, bevel: o.bevel ?? 0.006,
         gapA: o.gapA ?? 0.007, gapB: o.gapB ?? 0.007,
         gap0: k === 0 ? o.gapFront ?? 0.004 : o.gapCut ?? 0.006,
@@ -292,7 +292,7 @@ export function build(ctx) {
           railB: (t) => { const tt = t0 + (t1 - t0) * t; return mix(A(tt), B(tt), s1); },
           segS: 4, segT: Math.max(6, Math.round(lenDeg * 0.3 * (t1 - t0))),
           offset: off, thickness: 0.03, bevel: 0.004, gap: 0.0, gap0: 0.0, gap1: 0.0,
-          lift: (s, t) => lift(s0 + (s1 - s0) * s, t0 + (t1 - t0) * t, k) + 0.008,
+          lift: (s, t) => lift(s0 + (s1 - s0) * s, t0 + (t1 - t0) * t, k) + 0.012,
         });
         const subMat = mat === gunA || mat === gunB ? gunA : chromeA;
         const l = ctx.mesh(sub, subMat, `cranium.${id}.${k}.inset.L`);
@@ -308,19 +308,19 @@ export function build(ctx) {
   // is cut only where the skull turns (crown -> back), never in narrow strips.
   // Plates sit lower toward the back of the skull so they add no bulk there.
   // band 1 — forehead lobes: from the brow line over the crown
-  band('band1', S0, S1, [30, [150, 146], 240],
-    { mat: chromeA, offset: 0.018, stagger: -0.008, gapA: 0.006, gapB: 0.007, tuck: 0.012, lift: (s) => crown(0.012)(s) });
+  band('band1', S0, S1, [30, [150, 146], [200, 196], 240],
+    { mat: chromeA, inset: (k) => (k >= 1 ? [[0.18, 0.48, 0.12, 0.5], [0.54, 0.84, 0.4, 0.82]] : null), offset: 0.018, stagger: -0.008, gapA: 0.006, gapB: 0.007, tuck: 0.012, lift: (s) => crown(0.012)(s) });
   // band 2 — parietal sweep from the brow corner back over the skull
-  band('band2', S1, S2, [30, [128, 122], 250],
-    { mat: chromeB, offset: 0.008, stagger: -0.006, tuck: 0.008, gapB: 0.007, lift: (s) => crown(0.012)(s) });
+  band('band2', S1, S2, [30, [128, 122], [178, 172], [222, 216], 250],
+    { mat: (k) => (k === 2 ? gunA : chromeB), inset: (k) => (k >= 1 ? [0.22, 0.78, 0.2, 0.72] : null), offset: 0.008, stagger: -0.006, tuck: 0.008, gapB: 0.007, lift: (s) => crown(0.012)(s) });
   // band 3 — temple: arcs over the ear from the temple to the back of the head
-  band('band3', S2, S3, [20, [118, 112], [214, 218], 280],
-    { mat: (k) => (k === 1 ? gunA : chromeA), offset: 0.014, stagger: -0.008, gapB: 0.01, lift: (s) => crown(0.01)(s) });
+  band('band3', S2, S3, [20, [118, 112], [166, 162], [214, 218], [252, 256], 280],
+    { mat: (k) => (k % 2 ? gunA : chromeA), inset: (k) => (k === 2 || k === 3 ? [0.25, 0.75, 0.15, 0.6] : null), rivets: 5, offset: 0.014, stagger: -0.008, gapB: 0.01, lift: (s) => crown(0.01)(s) });
   // band 4 — side of the head behind the cheek ring
-  band('band4', S3, S3b, [0, [140, 142], [236, 240], 300],
+  band('band4', S3, S3b, [0, [140, 142], [190, 194], [236, 240], 300],
     { mat: (k) => (k % 2 ? gunA : chromeB), offset: 0.02, stagger: -0.006, gapA: 0.004, gapB: 0.01, lift: (s) => crown(0.008)(s) });
   // band 5 — innermost arc around the jaw hinge
-  band('band5', S3b, S4, [-20, [160, 166], 320],
+  band('band5', S3b, S4, [-20, [160, 166], [222, 228], 320],
     { mat: (k) => (k % 2 ? chromeB : gunB), offset: 0.006, stagger: 0.006, gapB: 0.008, segS: 8, lift: (s) => crown(0.007)(s) });
 
   // ------------------------------------------------------------ 4b. forehead front plates
@@ -403,6 +403,83 @@ export function build(ctx) {
     insets.forEach(([A, B, h], i) => addPair(P(A, B, { gapA: 0, gapB: 0, gap1: 0, lift: () => h, segS: 3, segT: 6, bevel: 0.003 }), trimMat, `cranium.fore.inset${i}`, 'band'));
   }
 
+  // ------------------------------------------------------------ 4c. side-of-head strips (model-side sculpt)
+  // ultron-model-side.png: a long horizontal RIBBED strip runs from behind the
+  // outer eye corner back along the side of the skull above the turbine, with
+  // layered plates stacked above / below it (temple). Rails are authored as
+  // side-view (z, y) points on the left side and converted to the (u, y) chart.
+  {
+    const uForZ = (y, z) => {
+      const s = field.section(y);
+      const d = z >= s.zc ? s.zf : s.zb;
+      const r = THREE.MathUtils.clamp((z - s.zc) / d, -0.9999, 0.9999);
+      const cu = Math.sign(r) * Math.pow(Math.abs(r), s.n / 2);
+      return Math.acos(cu);
+    };
+    const zrail = (pts) => {
+      const c = new THREE.SplineCurve(pts.map(([z, y]) => new THREE.Vector2(uForZ(y, z), y)));
+      c.arcLengthDivisions = 200;
+      const v = new THREE.Vector2();
+      return (t) => { c.getPointAt(THREE.MathUtils.clamp(t, 0, 1), v); return [v.x, v.y]; };
+    };
+    const mixR = (a, b, k) => (t) => { const p = a(t), q = b(t); return [p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k]; };
+    const sub = (r, t0, t1) => (t) => r(t0 + (t1 - t0) * t);
+    const SP = (A, B, o) => ribbonPlate(THREE, geo, {
+      chart: field.chart, railA: A, railB: B, segS: o.segS ?? 8, segT: o.segT ?? 60,
+      offset: 0, thickness: o.th ?? 0.07, bevel: o.bevel ?? 0.006,
+      gapA: o.gapA ?? 0.004, gapB: o.gapB ?? 0.004, gap0: o.gap0 ?? 0.004, gap1: o.gap1 ?? 0.004,
+      lift: o.lift,
+    });
+    const sm = THREE.MathUtils.smoothstep;
+    // rails (front -> back), side view (z, y)
+    const r0 = zrail([[0.44, 0.83], [0.3, 0.845], [0.12, 0.86], [-0.08, 0.875], [-0.28, 0.895], [-0.5, 0.92]]);
+    const r1 = zrail([[0.5, 0.9], [0.34, 0.91], [0.14, 0.922], [-0.06, 0.937], [-0.28, 0.955], [-0.52, 0.98]]);
+    const r2 = zrail([[0.53, 0.995], [0.36, 1.005], [0.16, 1.017], [-0.04, 1.032], [-0.26, 1.05], [-0.52, 1.08]]);
+    const r3 = zrail([[0.56, 1.13], [0.38, 1.14], [0.16, 1.155], [-0.06, 1.175], [-0.28, 1.2], [-0.5, 1.235]]);
+    // ribbed strip: raised spine + dense cross ribs (vent-like), fading at the ends
+    const ribbed = SP(r1, r2, {
+      segS: 4, segT: 170, th: 0.08,
+      lift: (s, t) => {
+        const end = sm(t, 0.0, 0.06) * (1 - sm(t, 0.94, 1.0));
+        const rib = Math.pow(Math.abs(Math.sin(t * Math.PI * 40)), 4);
+        const edge = sm(s, 0.08, 0.22) * (1 - sm(s, 0.78, 0.92));
+        return 0.042 + 0.004 * end - 0.01 * rib * edge + 0.005 * Math.exp(-Math.pow((s - 0.5) / 0.08, 2));
+      },
+    });
+    addPair(ribbed, gunA, 'cranium.side.ribbed', 'band');
+    // under-strip: plain plate between the ribbed strip and the cheek band, cut in two
+    [[0, 0.48], [0.48, 1]].forEach(([t0, t1], k) => {
+      addPair(SP(sub(r0, t0, t1), sub(r1, t0, t1), { segS: 4, segT: 20, gapB: 0.003, gap0: k ? 0.005 : 0.004, gap1: k ? 0.004 : 0.005, lift: (s) => 0.04 + 0.004 * Math.sin(Math.PI * s) }),
+        k ? chromeB : chromeA, `cranium.side.under${k}`, 'band');
+    });
+    // temple plates above the strip, stepped in two layers and cut into three
+    [[0, 0.3], [0.3, 0.66], [0.66, 1]].forEach(([t0, t1], k) => {
+      addPair(SP(sub(r2, t0, t1), sub(mixR(r2, r3, 0.55), t0, t1), { segS: 4, segT: 12, gapA: 0.003, gap0: 0.005, gap1: 0.005, lift: (s) => 0.044 + 0.003 * Math.sin(Math.PI * s) + (k % 2 ? 0.005 : 0) }),
+        k % 2 ? chromeA : gunB, `cranium.side.temple${k}`, 'band');
+      addPair(SP(sub(mixR(r2, r3, 0.55), t0, t1), sub(r3, t0, t1), { segS: 4, segT: 12, gapA: 0.004, gap0: 0.005, gap1: 0.005, lift: (s) => 0.034 + 0.003 * Math.sin(Math.PI * s) }),
+        k % 2 ? gunA : chromeB, `cranium.side.templeTop${k}`, 'band');
+    });
+    // lower side rows: horizontal layered plates above the hinge / behind the
+    // cheek C-band, stepping down (each row a little lower than the one above)
+    const rL0 = zrail([[0.22, 0.74], [0.04, 0.748], [-0.14, 0.762], [-0.32, 0.785], [-0.56, 0.83]]);
+    const rL1 = zrail([[0.16, 0.63], [0.0, 0.64], [-0.18, 0.66], [-0.38, 0.693], [-0.58, 0.74]]);
+    const r0b = (t) => r0(0.3 + 0.7 * t); // back part of r0 above the low rows
+    const rows = [
+      [rL0, r0b, 0.036, [[0, 0.36], [0.36, 0.7], [0.7, 1]], [chromeA, gunA, chromeB]],
+      [rL1, rL0, 0.03, [[0, 0.45], [0.45, 1]], [chromeB, chromeA]],
+    ];
+    rows.forEach(([A, B, h, cuts, mats], ri) => cuts.forEach(([t0, t1], k) => {
+      addPair(SP(sub(A, t0, t1), sub(B, t0, t1), { segS: 4, segT: 12, gapB: 0.004, gap0: 0.005, gap1: 0.005, lift: (s) => h + 0.003 * Math.sin(Math.PI * s) + (k % 2 ? 0.004 : 0) }),
+        mats[k], `cranium.side.row${ri}.${k}`, 'band');
+    }));
+    // short raised slivers on the ribbed strip's front end (grille blocks)
+    for (let i = 0; i < 4; i++) {
+      const t0 = 0.08 + i * 0.07;
+      addPair(SP(sub(mixR(r1, r2, 0.18), t0, t0 + 0.045), sub(mixR(r1, r2, 0.42), t0, t0 + 0.045), { segS: 2, segT: 4, th: 0.04, bevel: 0.003, gapA: 0, gapB: 0, gap0: 0, gap1: 0, lift: () => 0.062 }),
+        trimMat, `cranium.side.block${i}`, 'band');
+    }
+  }
+
   // ------------------------------------------------------------ 5. jaw-hinge caps (chart pole)
   {
     const g = ribbonPlate(THREE, geo, {
@@ -434,12 +511,10 @@ export function build(ctx) {
   root.add(temple.L, temple.R);
   const pole = new THREE.Vector3(), poleN = new THREE.Vector3();
   finChart.chart(89.5 * DEG, 90 * DEG, pole, poleN);
-  const rings = [
-    // [phi0, phi1, theta0, theta1, offset, thickness, material, name]
-    // the centre (phi > ~81deg, r < ~0.09) is left clear for the fins' own socket collar
-    [72, 80.5, -130, 230, 0.026, 0.04, gunA, 'ring0'],      // ribbed seat ring around the fin root
-    [74.5, 80.5, 25, 165, 0.04, 0.025, chromeA, 'ring1'],   // upper crescent
-  ];
+  // Round 6: the fins now root on a bracket lower on the skull side (fins.js),
+  // so the old upper fin-root seat rings are gone (they read as an empty
+  // socket in side view). The temple groups stay so templeOpen/Spin are valid.
+  const rings = [];
   for (const [p0, p1, t0, t1, off, thick, mat, nm] of rings) {
     const full = t1 - t0 >= 359;
     const g = ribbonPlate(THREE, geo, {
@@ -459,7 +534,8 @@ export function build(ctx) {
 
   // ------------------------------------------------------------ back pull-in
   root.updateMatrixWorld(true);
-  root.traverse((o) => { if (o.isMesh && o.parent === root) backWarp(THREE, o.geometry); });
+  // plates on the root AND their child insets / rivets (same space as their parent plate)
+  root.traverse((o) => { if (o.isMesh && (o.parent === root || (o.parent.isMesh && o.parent.parent === root))) backWarp(THREE, o.geometry); });
   crestGroup.traverse((o) => { if (o.isMesh) backWarp(THREE, o.geometry); });
 
   // ------------------------------------------------------------ params

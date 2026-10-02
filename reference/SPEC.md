@@ -4,6 +4,16 @@ Targets, in priority order: **`ultron-face-close.png` (view `faceclose`) — the
 film frames), `ultron-threequarter.webp` (ILM concept, best detail),
 `ultron-front.png` (best orthographic proportions), `ultron-poster-34.png`.
 
+## Side / depth references (round 6)
+
+- `ultron-model-side.png` (view `modelside`, model's RIGHT side, yaw -58): untextured 3D sculpt — authority for
+  DEPTH layout: how far back the turbine sits behind the eye, the fin path around it, the jaw line and chin
+  projection, the back of the skull, where the neck enters. Its crown-to-eye ratio is higher than the film's;
+  keep FRONT proportions from the film stills / face close-up.
+- `ultron-sketch-34.png` (pencil 3/4, left side), `ultron-poster-tall.png` (poster 3/4, right side),
+  `ultron-film-low.png` (film, low front angle): visual references for plate flow and silhouette.
+- Overlay `modelside` aligns on the eye + chin button (`pair`), not two eyes.
+
 ## Proportions (already encoded in `src/ultron/anatomy.js`)
 
 E = eye spacing = 0.67 head units. All HEAD space, +X = model's left.
