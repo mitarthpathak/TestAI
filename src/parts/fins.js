@@ -36,10 +36,10 @@ export function build(ctx) {
   const deg = THREE.MathUtils.degToRad;
 
   const bladeMat = M.get('chrome', { roughness: 0.17, color: 0xadb3ba, panel: 3.2, seed: 61, lineWidth: 0.0028 });
-  const innerMat = M.get('gunmetal', { roughness: 0.24, color: 0x858c94, panel: 4, seed: 63, lineWidth: 0.003 });
+  const innerMat = M.get('gunmetal', { roughness: 0.3, color: 0x60676f, panel: 4, seed: 63, lineWidth: 0.003 });
   const ridgeMat = M.get('chrome', { roughness: 0.14, color: 0xb0b6bc });
   const edgeMat = M.get('chrome', { roughness: 0.08, color: 0xc4c9ce });
-  const bracketMat = M.get('chrome', { roughness: 0.22, color: 0x80878f });
+  const bracketMat = M.get('gunmetal', { roughness: 0.3, color: 0x6a7179 });
   const knuckleMat = M.get('chrome', { roughness: 0.2, color: 0x7d838a });
   const socketMat = M.get('gunmetal', { roughness: 0.32 });
   const darkMat = M.get('darkMetal');
@@ -61,10 +61,16 @@ export function build(ctx) {
     // free top just above eye level, outer curve round the back of the disc,
     // lower end low and forward under the turbine near the jaw. x (front ( )
     // outline, max ~1.09 at y ~0.75) unchanged.
-    V(0.92, 1.21, 0.18),
-    V(1.04, 1.05, 0.17),
-    V(1.09, 0.86, 0.13),
-    V(1.09, 0.66, 0.12),
+    // round 7: slim upper extension rising from the free top behind the temple
+    // (front still: the ( ) frame reaches ~y 1.45; sculpt: the broad blade stays low)
+    // round 7 (sculpt overlay): upper half swung BACK behind the turbine
+    V(0.72, 1.47, -0.21),
+    V(0.84, 1.37, -0.13),
+    V(0.92, 1.26, -0.06),
+    V(0.99, 1.14, -0.01),
+    V(1.06, 1.02, 0.03),
+    V(1.095, 0.86, 0.06),
+    V(1.09, 0.66, 0.1),
     V(1.04, 0.47, 0.16),
     V(0.95, 0.33, 0.29),
     V(0.85, 0.25, 0.39),
@@ -99,8 +105,8 @@ export function build(ctx) {
   };
   // half width across the face / half thickness
   // concept art: thick, broad BLADES (not wires) with a heavy bevel
-  const mainW = keys([[0, 0.006], [0.06, 0.055], [0.16, 0.095], [0.38, 0.118], [0.62, 0.11], [0.82, 0.08], [0.94, 0.04], [1, 0.004]]);
-  const mainH = keys([[0, 0.008], [0.08, 0.028], [0.3, 0.036], [0.7, 0.034], [0.9, 0.024], [1, 0.005]]);
+  const mainW = keys([[0, 0.006], [0.04, 0.026], [0.13, 0.038], [0.25, 0.09], [0.46, 0.116], [0.66, 0.11], [0.84, 0.08], [0.95, 0.04], [1, 0.004]]);
+  const mainH = keys([[0, 0.008], [0.05, 0.02], [0.18, 0.026], [0.32, 0.036], [0.72, 0.034], [0.91, 0.024], [1, 0.005]]);
 
   /** Lens / blade section with chamfered bevels (CCW, x across, y face). */
   const lens = (Wf, Hf) => (t) => {
@@ -167,7 +173,7 @@ export function build(ctx) {
   // ------------------------------------------------------- inner blade
   // connector from the root knuckle on the cranium side, standing off the
   // skull, down and out to merge into the inner edge of the main blade.
-  const T_MERGE = 0.3;
+  const T_MERGE = 0.43;
   const mf = frameAt(mainCurve, mainUp, T_MERGE);
   const mergeP = mf.P.clone().addScaledVector(mf.B, inwardSign(T_MERGE) * mainW(T_MERGE) * 0.6);
   const innerCurve = new THREE.CatmullRomCurve3([
@@ -177,7 +183,7 @@ export function build(ctx) {
   ], false, 'centripetal');
   // round 6: a broad bracket plate (not a rod) carrying the blade off the skull
   // tall plate (vertical extent) so it never reads as a strut / antenna from the front
-  const innerW = keys([[0, 0.15], [0.2, 0.14], [0.6, 0.12], [0.9, 0.1], [1, 0.09]]);
+  const innerW = keys([[0, 0.075], [0.2, 0.065], [0.6, 0.058], [0.9, 0.055], [1, 0.055]]); // round 7: slimmer (front view read as a bar)
   const innerH = keys([[0, 0.03], [0.5, 0.026], [1, 0.024]]);
   const innerGeo = geo.sweptSection(innerCurve, lens(innerW, innerH), {
     steps: 40, up: () => V(0, 0.25, 1).normalize(), creaseAngle: deg(24),
@@ -185,12 +191,12 @@ export function build(ctx) {
   const innerRoot = knuckleC.clone();
 
   // ------------------------------------------------- clamp bracket (merge)
-  const clampCurve = new THREE.CatmullRomCurve3([0.27, 0.29, 0.31, 0.33].map((t) => mainCurve.getPointAt(t)));
+  const clampCurve = new THREE.CatmullRomCurve3([0.4, 0.42, 0.44, 0.46].map((t) => mainCurve.getPointAt(t)));
   const armGeo = geo.sweptSection(clampCurve, (t) => {
-    const W = mainW(0.3) + 0.008, H = mainH(0.3) + 0.007;
+    const W = mainW(T_MERGE) + 0.008, H = mainH(T_MERGE) + 0.007;
     const b = 0.01;
     return [[W, 0], [W - b * 0.4, H * 0.7], [W - b, H], [-W + b, H], [-W + b * 0.4, H * 0.7], [-W, 0], [-W + b * 0.4, -H * 0.7], [-W + b, -H], [W - b, -H], [W - b * 0.4, -H * 0.7]];
-  }, { steps: 12, up: (t) => mainUp(0.27 + t * 0.06), creaseAngle: deg(30) });
+  }, { steps: 12, up: (t) => mainUp(0.4 + t * 0.06), creaseAngle: deg(30) });
 
   const knuckleGeo = new THREE.SphereGeometry(0.055, 24, 16);
   knuckleGeo.translate(knuckleC.x, knuckleC.y, knuckleC.z);
