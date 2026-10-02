@@ -74,13 +74,13 @@ function socketPoint(anatomy, side, t, k = 1) {
   return [side * (e[0] + o), e[1] + v];
 }
 
-const LENS_R = 0.058;      // small ringed disc, half hidden by the lids (face close-up)
+const LENS_R = 0.068;      // small ringed disc, half hidden by the lids (face close-up)
 const LENS_Z = 0.012;      // lens in front of the eye joint (local z)
 const LID_C = -0.075;      // lid hinge axis behind the eye joint (local z)
 const LID_R = 0.118;       // lid shell radius about the hinge
 const LID_TH = 0.009;
 const LOOK_C = -0.07;      // gaze pivot behind the lens
-const UP_C = 0.26;         // upper lid edge angle at the centre of the arch (rad, + up)
+const UP_C = 0.1;         // upper lid edge angle at the centre of the arch (rad, + up)
 const LO_C = -0.44;        // lower lid edge angle at the centre of the sag
 const MEET = -0.06;        // where the lids meet on a blink
 const LOOK_X = 0.2, LOOK_Y = 0.12;
@@ -125,7 +125,7 @@ void main() {
   // hot white-pink outer rim
   col = mix(col, white, ring(r, 0.85, 0.085, aa));
   // small white pupil ring near the top centre
-  vec2 q = (p - vec2(0.0, 0.14)) / max(0.3, uPupil);
+  vec2 q = (p - vec2(0.0, -0.02)) / max(0.3, uPupil);
   float qr = length(q);
   col = mix(col, white, 1.0 - smoothstep(0.17 - aa, 0.17 + aa, qr));
   col = mix(col, red * 0.5, ring(qr, 0.22, 0.035, aa));
@@ -206,7 +206,7 @@ export function build(ctx) {
   // CURVED lid edges (face close-up): the upper edge arches over the iris
   // (almond), peaking a little toward the outer corner; the lower edge sags.
   // u = outward coordinate (-1 inner corner .. +1 outer corner).
-  const thUp = (u) => UP_C - 0.27 * (u - 0.18) * (u - 0.18) + 0.05 * u;
+  const thUp = (u) => UP_C - 0.2 * (u - 0.18) * (u - 0.18) + 0.06 * u; // flatter: the lid cuts the iris top off (face close-up)
   const thLo = (u) => LO_C + 0.34 * u * u - 0.03 * u;
   /** thick lid shell between theta edge(x) and a fixed far angle, swept across x */
   const lidShell = (side, edgeFn, far, r0, r1, x0 = -W, x1 = W, nx = 28, nt = 12) => {

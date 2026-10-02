@@ -71,20 +71,48 @@ function inRegion(P, m = 0) {
   return Math.abs(P.x) > 0.6 - m && P.y > 1.06 - m;
 }
 
-// Back-of-skull pull-in: the film skull is shorter behind the fin roots than
-// the shared shell. Everything behind z = BACK_Z is compressed toward it
-// (smoothly, fading out low down where the neck enters).
-const BACK_Z = -0.18;
-const BACK_K = 0.72;
-function backWarp(THREE, g) {
+// Back-of-skull pull-in (round 7, ultron-model-side.png): the sculpt's skull is
+// much more compact behind the eye than the shared shell. Everything behind
+// z = BACK_Z is remapped so the mid-plane back of the shell lands on
+// BACK_TARGET(y) (head-space z), smoothly (slope 1 at BACK_Z and at the shell),
+// fading out low down where the neck enters. Front view is unchanged (z only).
+const BACK_Z = -0.05;
+//                 y     back z of the shell after the warp
+const BACK_TARGET = [[0.3, -0.46], [0.6, -0.43], [0.95, -0.4], [1.2, -0.38], [1.45, -0.35], [1.65, -0.3], [1.8, -0.22], [1.86, -0.18]];
+const BACK_YMAX = 1.86; // above this the crown keeps the compression ratio of y = 1.86 (no flap where the shell closes)
+function backTarget(y) {
+  const T = BACK_TARGET;
+  if (y <= T[0][0]) return T[0][1];
+  for (let i = 1; i < T.length; i++) if (y <= T[i][0]) {
+    const [y0, z0] = T[i - 1], [y1, z1] = T[i];
+    return z0 + ((z1 - z0) * (y - y0)) / (y1 - y0);
+  }
+  return T[T.length - 1][1];
+}
+function backWarpZ(THREE, anatomy, y, z) {
+  const d = BACK_Z - z;
+  if (d <= 0) return z;
+  const yc = Math.min(y, BACK_YMAX);
+  const s = anatomy.headSection(yc);
+  const D = Math.max(0.05, BACK_Z - (s.zc - s.zb));
+  const Dt = Math.min(D, Math.max(0.02, BACK_Z - backTarget(yc)));
+  const fy = THREE.MathUtils.smoothstep(y, 0.0, 0.4);
+  // rational compression: slope 1 at BACK_Z, D -> Dt exactly, always monotone
+  const c = (D / Dt - 1) / D;
+  const dn = d / (1 + c * d);
+  return BACK_Z - (d + (dn - d) * fy);
+}
+// the upper back also drops a little (rounder, lower occiput dome in the
+// sculpt); only points well behind the crown move, so the front-view dome
+// outline (formed at z ~ zc) is untouched.
+const BACK_DROP = 0.1;
+function backWarp(THREE, anatomy, g) {
   const p = g.attributes.position;
+  const sm = THREE.MathUtils.smoothstep;
   for (let i = 0; i < p.count; i++) {
-    const z = p.getZ(i), y = p.getY(i);
-    const d = BACK_Z - z;
-    if (d <= 0) continue;
-    const ramp = THREE.MathUtils.smoothstep(d, 0, 0.3);
-    const fy = THREE.MathUtils.smoothstep(y, 0.35, 0.95);
-    p.setZ(i, z + (1 - BACK_K) * d * ramp * fy);
+    const y = p.getY(i), z = p.getZ(i);
+    p.setZ(i, backWarpZ(THREE, anatomy, y, z));
+    p.setY(i, y - BACK_DROP * sm(-z, 0.22, 0.6) * sm(y, 1.15, 1.9));
   }
   p.needsUpdate = true;
   g.computeVertexNormals();
@@ -354,51 +382,87 @@ export function build(ctx) {
     const slotI = rail([[0.15, 1.035], [0.178, 1.16], [0.212, 1.31], [0.236, 1.45], [0.25, 1.58], [0.256, 1.69]]);
     const slotO = rail([[0.182, 1.03], [0.208, 1.15], [0.242, 1.3], [0.266, 1.44], [0.281, 1.57], [0.288, 1.675]]);
     const outer = rail([[0.61, 1.03], [0.605, 1.15], [0.585, 1.26], [0.545, 1.38], [0.475, 1.5], [0.385, 1.6], [0.3, 1.665]]);
-    const midS = mixR(slotO, outer, 0.3);
-    const midO = mixR(slotO, outer, 0.64);
     const P = (A, B, o) => ribbonPlate(THREE, geo, {
       chart: field.chart, railA: A, railB: B, segS: o.segS ?? 6, segT: o.segT ?? 14,
       offset: 0, thickness: 0.06, bevel: o.bevel ?? 0.006,
       gapA: o.gapA ?? 0.006, gapB: o.gapB ?? 0.006, gap0: o.gap0 ?? 0, gap1: o.gap1 ?? 0.006,
       lift: o.lift,
     });
-    const foreMats = [foreA, foreB, foreC, foreB, foreA];
-    // column = [name, railA, railB, cuts (t on A / t on B), base height]
-    const cols = [
-      ['inner', crestE, slotI, [0, [0.36, 0.24], [0.62, 0.5], [0.84, 0.74], 1], 0.028],
-      ['lobeA', slotO, midS, [0, [0.3, 0.14], [0.56, 0.4], [0.8, 0.64], 1], 0.026],
-      ['lobeB', midS, midO, [0, [0.12, 0.32], [0.4, 0.6], [0.66, 0.84], 1], 0.03],
-      ['lobeC', midO, outer, [0, [0.4, 0.2], [0.72, 0.5], 1], 0.024],
+    // Round 7 lattice (face close-up + ILM 3/4): BROAD angular trapezoids.
+    // Long rails diverge upward from the crest base (slot, mid arc, outer edge);
+    // continuous diagonal cross seams run from low on the outer edge up and
+    // in to the crest, so the plates read as a diagonal lattice converging on
+    // the crest, not as vertical columns.
+    const arcM = rail([[0.3, 1.035], [0.345, 1.15], [0.39, 1.28], [0.415, 1.4], [0.41, 1.5], [0.375, 1.6], [0.33, 1.655]]);
+    // front-view seam lines (x, y) outer end -> crest end
+    const SEAMS = [
+      [[0.66, 1.1], [0.08, 1.33]],
+      [[0.62, 1.3], [0.08, 1.52]],
+      [[0.5, 1.5], [0.06, 1.68]],
     ];
-    cols.forEach(([nm, A, B, cuts, h], ci) => {
+    const fwd = new THREE.Vector3();
+    const xyOn = (r, t) => { const [u, y] = r(t); field.surface(u, y, fwd); return [Math.abs(fwd.x), y]; };
+    /** t on rail r where it crosses seam line k (null if it does not) */
+    const crossT = (r, k) => {
+      const [[x0, y0], [x1, y1]] = SEAMS[k];
+      const sd = (t) => { const [x, y] = xyOn(r, t); return (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0); };
+      let prev = sd(0), tp = 0;
+      for (let i = 1; i <= 120; i++) {
+        const t = i / 120, v = sd(t);
+        if ((prev < 0) !== (v < 0)) {
+          let lo = tp, hi = t;
+          for (let j = 0; j < 20; j++) { const m = 0.5 * (lo + hi); if ((sd(m) < 0) === (prev < 0)) lo = m; else hi = m; }
+          return 0.5 * (lo + hi);
+        }
+        prev = v; tp = t;
+      }
+      return null;
+    };
+    const cutsFor = (A, B) => {
+      const c = [0];
+      for (let k = 0; k < SEAMS.length; k++) {
+        const ta = crossT(A, k), tb = crossT(B, k);
+        const pa = c[c.length - 1], a0 = Array.isArray(pa) ? pa[0] : pa, b0 = Array.isArray(pa) ? pa[1] : pa;
+        if (ta != null && tb != null && ta > a0 + 0.08 && tb > b0 + 0.08 && ta < 0.94 && tb < 0.94) c.push([ta, tb]);
+      }
+      c.push(1);
+      return c;
+    };
+    const foreMats = [foreA, foreB, foreC, foreB, foreA];
+    // column = [name, railA, railB, base height, facet tilt]
+    const cols = [
+      ['inner', crestE, slotI, 0.03, 0.004],
+      ['mid', slotO, arcM, 0.026, -0.008],
+      ['outer', arcM, outer, 0.03, 0.008],
+    ];
+    cols.forEach(([nm, A, B, h, tilt], ci) => {
+      const cuts = cutsFor(A, B);
       for (let k = 0; k < cuts.length - 1; k++) {
         const [a0, b0] = Array.isArray(cuts[k]) ? cuts[k] : [cuts[k], cuts[k]];
         const [a1, b1] = Array.isArray(cuts[k + 1]) ? cuts[k + 1] : [cuts[k + 1], cuts[k + 1]];
         const first = k === 0, last = k === cuts.length - 2;
-        const hk = h + ((k + ci) % 2 ? 0.006 : 0) + 0.002 * ((k * 7 + ci * 3) % 3);
+        const hk = h + ((k + ci) % 2 ? 0.007 : 0);
+        const tk = tilt * (k % 2 ? -1 : 1);
         const lift = (s, t) => {
-          let v = hk + 0.003 * Math.sin(Math.PI * s);
+          // flat angular facet: tilted across the plate, a hard ridge 1/3 in
+          let v = hk + tk * (s - 0.5) + 0.004 * Math.max(0, 1 - Math.abs(s - 0.35) / 0.35);
           if (first) v = v * THREE.MathUtils.smoothstep(t, 0.03, 0.3) + 0.006;
           // top row: blends down to the crown band level at the top of the dome
           if (last) v = THREE.MathUtils.lerp(v, 0.024, THREE.MathUtils.smoothstep(t, 0.4, 1.0));
           return v;
         };
-        const g = P(sub(A, a0, a1), sub(B, b0, b1), { lift, gap0: first ? 0 : 0.0045, gap1: last ? 0.0 : 0.0045 });
+        const g = P(sub(A, a0, a1), sub(B, b0, b1), { lift, segS: 8, segT: 16, gap0: first ? 0 : 0.006, gap1: last ? 0.0 : 0.006 });
         addPair(g, foreMats[(k + ci * 2) % foreMats.length], `cranium.fore.${nm}${k}`, 'band');
       }
     });
     // slot floor: dark recessed strip in the diagonal groove, faint red seam inside
     addPair(P(slotI, slotO, { gapA: -0.002, gapB: -0.002, gap1: 0.0, lift: () => -0.01, segS: 3, segT: 30 }), gunB, 'cranium.fore.slot', 'band');
-    addPair(P(mixR(slotI, slotO, 0.42), mixR(slotI, slotO, 0.58), { gapA: 0, gapB: 0, gap1: 0.02, gap0: 0.03, lift: () => -0.006, segS: 2, segT: 24, bevel: 0.001 }), seamDim, 'cranium.fore.slotGlow', 'band');
-    // slim slanted slivers along the plate flow (angular seams, not windows)
+    addPair(P(mixR(slotI, slotO, 0.42), mixR(slotI, slotO, 0.58), { gapA: 0, gapB: 0, gap1: 0.02, gap0: 0.09, lift: () => -0.006, segS: 2, segT: 24, bevel: 0.001 }), seamDim, 'cranium.fore.slotGlow', 'band');
+    // a few slim polished slivers laid ALONG the diagonal seams (angular trim)
     const insets = [
-      [sub(mixR(slotO, midS, 0.25), 0.08, 0.2), sub(mixR(slotO, midS, 0.5), 0.06, 0.16), 0.04],
-      [sub(mixR(midS, midO, 0.2), 0.3, 0.42), sub(mixR(midS, midO, 0.36), 0.34, 0.47), 0.044],
-      [sub(mixR(midO, outer, 0.3), 0.36, 0.56), sub(mixR(midO, outer, 0.46), 0.3, 0.5), 0.04],
-      [sub(mixR(crestE, slotI, 0.35), 0.62, 0.76), sub(mixR(crestE, slotI, 0.6), 0.64, 0.75), 0.044],
-      [sub(mixR(slotO, midS, 0.55), 0.5, 0.66), sub(mixR(slotO, midS, 0.72), 0.46, 0.62), 0.042],
-      [sub(mixR(midS, midO, 0.55), 0.58, 0.68), sub(mixR(midS, midO, 0.8), 0.6, 0.7), 0.046],
-      [sub(mixR(midO, outer, 0.55), 0.08, 0.18), sub(mixR(midO, outer, 0.8), 0.1, 0.2), 0.036],
+      [sub(mixR(slotO, arcM, 0.15), 0.18, 0.3), sub(mixR(slotO, arcM, 0.32), 0.14, 0.26), 0.044],
+      [sub(mixR(arcM, outer, 0.55), 0.22, 0.34), sub(mixR(arcM, outer, 0.75), 0.18, 0.3), 0.046],
+      [sub(mixR(slotO, arcM, 0.55), 0.62, 0.72), sub(mixR(slotO, arcM, 0.78), 0.58, 0.68), 0.042],
     ];
     insets.forEach(([A, B, h], i) => addPair(P(A, B, { gapA: 0, gapB: 0, gap1: 0, lift: () => h, segS: 3, segT: 6, bevel: 0.003 }), trimMat, `cranium.fore.inset${i}`, 'band'));
   }
@@ -535,8 +599,8 @@ export function build(ctx) {
   // ------------------------------------------------------------ back pull-in
   root.updateMatrixWorld(true);
   // plates on the root AND their child insets / rivets (same space as their parent plate)
-  root.traverse((o) => { if (o.isMesh && (o.parent === root || (o.parent.isMesh && o.parent.parent === root))) backWarp(THREE, o.geometry); });
-  crestGroup.traverse((o) => { if (o.isMesh) backWarp(THREE, o.geometry); });
+  root.traverse((o) => { if (o.isMesh && (o.parent === root || (o.parent.isMesh && o.parent.parent === root))) backWarp(THREE, anatomy, o.geometry); });
+  crestGroup.traverse((o) => { if (o.isMesh) backWarp(THREE, anatomy, o.geometry); });
 
   // ------------------------------------------------------------ params
   const center = new THREE.Vector3(0, 1.05, -0.05);
