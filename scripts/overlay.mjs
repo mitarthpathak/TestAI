@@ -32,6 +32,8 @@ export const REFS = [
   { view: 'filmfront',    file: 'ultron-film-front.png',    eyeR: [177.8, 163.5], eyeL: [282.5, 144.1] },
   { view: 'film34',       file: 'ultron-film-34.png',       eyeR: [63.9, 81.0],   eyeL: [105.9, 54.3] },
   { view: 'threequarter', file: 'ultron-threequarter.webp', eyeR: [423.5, 237.1], eyeL: [632.5, 231.9] },
+  // single-eye views align on another landmark pair: `pair: [a, b]` names keys of the render json
+  { view: 'modelside',    file: 'ultron-model-side.png',    pair: ['eyeR', 'chin'], eyeR: [497, 248], chin: [609, 573] },
   { view: 'faceclose',    file: 'ultron-face-close.png',    eyeR: [119.0, 161.3], eyeL: [382.6, 158.7] },
   { view: 'filmbody',     file: 'ultron-film-body.png',     eyeR: [329.5, 144.0], eyeL: [403.0, 143.0] },
 ];
@@ -72,8 +74,9 @@ const result = await page.evaluate(async ({ jobs, H }) => {
     const ref = await load(j.ref), ren = await load(j.render);
     const s = H / ref.height, W = Math.round(ref.width * s);
     // reference eye pixels in the output frame
-    const rR = [j.eyeR[0] * s, j.eyeR[1] * s], rL = [j.eyeL[0] * s, j.eyeL[1] * s];
-    const mR = j.marks.eyeR, mL = j.marks.eyeL;
+    const [ka, kb] = j.pair || ['eyeR', 'eyeL'];
+    const rR = [j[ka][0] * s, j[ka][1] * s], rL = [j[kb][0] * s, j[kb][1] * s];
+    const mR = j.marks[ka], mL = j.marks[kb];
     // similarity transform render -> ref frame from the eye pair
     const dv = [mL[0] - mR[0], mL[1] - mR[1]], dr = [rL[0] - rR[0], rL[1] - rR[1]];
     const scale = Math.hypot(...dr) / Math.hypot(...dv);
