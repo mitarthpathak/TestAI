@@ -511,12 +511,10 @@ export function build(ctx) {
   root.add(temple.L, temple.R);
   const pole = new THREE.Vector3(), poleN = new THREE.Vector3();
   finChart.chart(89.5 * DEG, 90 * DEG, pole, poleN);
-  const rings = [
-    // [phi0, phi1, theta0, theta1, offset, thickness, material, name]
-    // the centre (phi > ~81deg, r < ~0.09) is left clear for the fins' own socket collar
-    [72, 80.5, -130, 230, 0.026, 0.04, gunA, 'ring0'],      // ribbed seat ring around the fin root
-    [74.5, 80.5, 25, 165, 0.04, 0.025, chromeA, 'ring1'],   // upper crescent
-  ];
+  // Round 6: the fins now root on a bracket lower on the skull side (fins.js),
+  // so the old upper fin-root seat rings are gone (they read as an empty
+  // socket in side view). The temple groups stay so templeOpen/Spin are valid.
+  const rings = [];
   for (const [p0, p1, t0, t1, off, thick, mat, nm] of rings) {
     const full = t1 - t0 >= 359;
     const g = ribbonPlate(THREE, geo, {

@@ -336,7 +336,7 @@ export const VIEWS = {
   closeup:      { azimuth: 12, elevation: 2,   distance: 4.6, target: [0, 2.3, 0.2] },
   film34:       { azimuth: 41, elevation: -28, distance: 12.6, fov: 14, target: [0, 1.95, 0.1] },
   filmfront:    { azimuth: 34, elevation: -5,  distance: 12.9, fov: 14, target: [0, 1.9, 0.1] },
-  modelside:    { azimuth: -58, elevation: 8,  distance: 13.3, fov: 14, target: [0, 2.0, 0] },  // reference/ultron-model-side.png (model's right side)
+  modelside:    { azimuth: -55, elevation: 8,  distance: 4.5, fov: 40, target: [0, 2.0, 0] },  // reference/ultron-model-side.png (model's right side)
   faceclose:    { azimuth: 0,  elevation: 0,   distance: 12, fov: 7.7, target: [0, 1.825, 0.6] },  // reference/ultron-face-close.png
   filmbody:     { azimuth: 0,  elevation: -5,  distance: 14, fov: 16.8, target: [0, 1.48, 0.2] },  // reference/ultron-film-body.png
   back34:       { azimuth: 125, elevation: 6,  distance: 7.0, target: [0, 2.0, 0] },

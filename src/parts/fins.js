@@ -176,8 +176,9 @@ export function build(ctx) {
     mergeP,
   ], false, 'centripetal');
   // round 6: a broad bracket plate (not a rod) carrying the blade off the skull
-  const innerW = keys([[0, 0.06], [0.2, 0.055], [0.6, 0.052], [0.9, 0.06], [1, 0.07]]);
-  const innerH = keys([[0, 0.022], [0.5, 0.02], [1, 0.02]]);
+  // tall plate (vertical extent) so it never reads as a strut / antenna from the front
+  const innerW = keys([[0, 0.15], [0.2, 0.14], [0.6, 0.12], [0.9, 0.1], [1, 0.09]]);
+  const innerH = keys([[0, 0.03], [0.5, 0.026], [1, 0.024]]);
   const innerGeo = geo.sweptSection(innerCurve, lens(innerW, innerH), {
     steps: 40, up: () => V(0, 0.25, 1).normalize(), creaseAngle: deg(24),
   });
