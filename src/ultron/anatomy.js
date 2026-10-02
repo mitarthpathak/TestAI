@@ -111,8 +111,8 @@ export const HEAD_PROFILE = [
   { y: -0.2,  w: 0.25, zf: 0.2,  zb: 0.3,  n: 2.4, zc: 0.52 },
   { y: 0.0,   w: 0.35, zf: 0.28, zb: 0.5,  n: 2.6, zc: 0.52 },
   { y: 0.24,  w: 0.46, zf: 0.38, zb: 0.72, n: 2.6, zc: 0.48 },
-  { y: 0.47,  w: 0.62, zf: 0.52, zb: 0.86, n: 2.6, zc: 0.32 },
-  { y: 0.72,  w: 0.72, zf: 0.62, zb: 0.95, n: 2.6, zc: 0.17 },
+  { y: 0.47,  w: 0.62, zf: 0.48, zb: 0.86, n: 2.6, zc: 0.32 },
+  { y: 0.72,  w: 0.72, zf: 0.58, zb: 0.95, n: 2.6, zc: 0.17 },
   { y: 0.95,  w: 0.75, zf: 0.64, zb: 1.0,  n: 2.5, zc: 0.08 },
   { y: 1.2,   w: 0.73, zf: 0.63, zb: 0.97, n: 2.4, zc: 0.03 },
   { y: 1.45,  w: 0.67, zf: 0.57, zb: 0.94, n: 2.3, zc: -0.01 },
@@ -331,7 +331,7 @@ export const VIEWS = {
   // film34 match their reference's lens + angle (scripts/overlay.mjs pairs them
   // by name); the long lenses keep the frame height of the 28deg / 7u camera.
   front:        { azimuth: 1,  elevation: -6,  distance: 19.6, fov: 10, target: [0, 1.85, 0] },
-  threequarter: { azimuth: 38, elevation: -17, distance: 13.3, fov: 14, target: [0, 1.95, 0.1] },
+  threequarter: { azimuth: 38, elevation: -17, distance: 13.3, fov: 14, target: [0, 1.95, 0.1], headPose: { rz: -0.22 } }, // concept head is tilted
   side:         { azimuth: 90, elevation: 0,   distance: 7.2, target: [0, 1.85, 0] },
   closeup:      { azimuth: 12, elevation: 2,   distance: 4.6, target: [0, 2.3, 0.2] },
   film34:       { azimuth: 41, elevation: -28, distance: 12.6, fov: 14, target: [0, 1.95, 0.1] },

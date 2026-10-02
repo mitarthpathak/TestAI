@@ -53,12 +53,12 @@ export function build(ctx) {
     step: M.get('gunmetal', { roughness: 0.36 }),
     base: M.get('chrome', { roughness: 0.3, color: 0x8d949c, panel: 3.5, seed: 70, lineWidth: 0.003 }),
     bright: M.get('chrome', { roughness: 0.12 }),
-    buttonFace: M.get('chrome', { roughness: 0.22 }),
+    buttonFace: M.get('chrome', { roughness: 0.34, color: 0xa7aeb5 }), // round 5: brushed, not a black mirror dome
     dark: M.get('darkMetal'),
     cavity: M.get('cavity'),
   };
   // close-up reference: light polished steel on the lower face
-  for (const k of ['column', 'carrier', 'chin', 'muzzle', 'sideA', 'sideB', 'sideC', 'base']) { mat[k].envMapIntensity = 2.4; mat[k].roughness = Math.max(mat[k].roughness, 0.42); }
+  for (const k of ['column', 'carrier', 'chin', 'muzzle', 'sideA', 'sideB', 'sideC', 'base']) { mat[k].envMapIntensity = 1.8; mat[k].roughness = Math.max(mat[k].roughness, 0.34); }
 
   // ------------------------------------------------------------ shared helpers
   const _t = new V3();
@@ -115,13 +115,24 @@ export function build(ctx) {
     return 0.032 * fx * fy;
   };
   /** front-projected point on the muzzle at (x, y) with extra offset n along +Z-ish normal */
+  // round 5: the chin recedes below the lip carrier (3/4 concept: chin button
+  // sits well behind the mouth, LANDMARKS.chinButton z 0.7). Same term in cheeks.js.
+  const chinPull = (x, y) => 0.06 * sstep(0.12 - y, 0, 0.3) * (0.55 + 0.45 * Math.exp(-Math.pow(x / 0.3, 2)));
   const muzZ = (x, y) => {
     const z = headFrontZ(x, y);
     if (z == null) {
       const s = headSection(y);
       return s.zc;
     }
-    return z + bulge(x, y);
+    return z + bulge(x, y) - chinPull(x, y);
+  };
+  /** head shell point with the receding chin applied (fades out round the sides) */
+  const shellAt = (u, y, t) => {
+    headSurface(u, y, t);
+    const sc = headSection(y);
+    const fz = sstep((t.z - sc.zc) / (sc.zf || 1), 0.1, 0.85);
+    t.z -= chinPull(t.x, y) * fz;
+    return t;
   };
   const frontOut = (x, y) => {
     const h = 1e-3;
@@ -212,7 +223,7 @@ export function build(ctx) {
   // the front follows the muzzle surface (flush with the column), then curls under
   const spinePts = [];
   for (const y of [-0.03, -0.09, -0.15, -0.21]) spinePts.push([y, muzZ(0, y) + 0.016]);
-  spinePts.push([-0.265, 0.675], [-0.31, 0.625], [-0.342, 0.56], [-0.36, 0.49], [-0.368, 0.42]);
+  spinePts.push([-0.265, 0.615], [-0.31, 0.565], [-0.342, 0.5], [-0.36, 0.43], [-0.368, 0.36]);
   spinePts.reverse();
   const spine = new THREE.SplineCurve(spinePts.map(([y, z]) => new THREE.Vector2(z, y)));
   const _sp = new THREE.Vector2(), _tg = new THREE.Vector2();
@@ -259,18 +270,18 @@ export function build(ctx) {
     btnPivot.position.copy(p).add(new V3(0, f.ny, f.nz).multiplyScalar(0.004));
     geo.faceDirection(btnPivot, new V3(0, f.ny, f.nz).normalize());
     const R = 0.068;
-    const seat = ctx.mesh(geo.ringStack([[R * 1.62, 0.004], [R * 1.55, 0.0], [R * 1.48, -0.012], [0, -0.012]], 64), mat.dark, 'jaw.button.seat');
+    const seat = ctx.mesh(geo.ringStack([[R * 1.62, 0.004], [R * 1.55, 0.0], [R * 1.48, -0.012], [0, -0.012]], 64), mat.step, 'jaw.button.seat');
     const ring = ctx.mesh(geo.ringStack([
       [R * 1.02, 0.008], [R * 1.06, 0.022], [R * 1.12, 0.028], [R * 1.2, 0.026], [R * 1.25, 0.016], [R * 1.32, 0.013], [R * 1.4, 0.012], [R * 1.45, 0.002], [R * 1.47, -0.01],
     ], 72), mat.bright, 'jaw.button.ring');
     const face = ctx.mesh(geo.ringStack([
-      [0, 0.024], [R * 0.4, 0.023], [R * 0.7, 0.02], [R * 0.9, 0.016], [R * 0.98, 0.01], [R, 0.0],
+      [0, 0.016], [R * 0.4, 0.016], [R * 0.7, 0.015], [R * 0.9, 0.013], [R * 0.98, 0.008], [R, 0.0],
     ], 56), mat.buttonFace, 'jaw.button');
     // slot detail on the face
     const archPts = [];
     for (let i = 0; i <= 16; i++) {
       const a = lerp(Math.PI * 0.15, Math.PI * 0.85, i / 16);
-      archPts.push(new V3(Math.cos(a) * R * 0.45, -R * 0.25 + Math.sin(a) * R * 0.3, 0.022 - 0.002 * Math.abs(Math.cos(a))));
+      archPts.push(new V3(Math.cos(a) * R * 0.45, -R * 0.25 + Math.sin(a) * R * 0.3, 0.0145 - 0.002 * Math.abs(Math.cos(a))));
     }
     const arch = ctx.mesh(geo.sweptSection(new THREE.CatmullRomCurve3(archPts), geo.roundedSection(0.006, 0.005, 2, 8), { steps: 24, up: () => new V3(0, 0, 1) }), mat.dark, 'jaw.button.slot');
     btnSpin.add(face, arch);
@@ -312,7 +323,7 @@ export function build(ctx) {
     const S = (u, b, t) => {
       const au = Math.abs(u);
       const y = lerp(jawLineY(au) - 0.01, sideTopY(au) + 0.02, b);
-      headSurface(u, y, t);
+      shellAt(u, y, t);
       headNormal(u, y, _t);
       return t.addScaledVector(_t, -0.012 + bulge(t.x, y) * 0.6);
     };
@@ -327,7 +338,7 @@ export function build(ctx) {
   for (const B of BANDS) {
     const S = (u, b, t) => {
       const y = lerp(jawLineY(u), bandTopY(u), b);
-      headSurface(u, y, t);
+      shellAt(u, y, t);
       headNormal(u, y, _t);
       const local = (b - B.b0) / (B.b1 - B.b0);
       return t.addScaledVector(_t, B.off + 0.004 * Math.sin(Math.PI * clamp(local, 0, 1)));
@@ -344,7 +355,7 @@ export function build(ctx) {
     for (let i = 0; i <= 32; i++) {
       const u = lerp(ua, ub, i / 32);
       const y = jawLineY(u) + 0.006;
-      const p = headSurface(u * side, y, new V3());
+      const p = shellAt(u * side, y, new V3());
       headNormal(u * side, y, N);
       pts.push(p.addScaledVector(N, 0.012));
     }
@@ -360,12 +371,12 @@ export function build(ctx) {
   {
     // from the jaw line, sloping down / in toward the neck
     const inner = (u, t) => {
-      const p = headSurface(u, jawLineY(u));
+      const p = shellAt(u, jawLineY(u), new V3());
       return t.set(p.x * 0.4, Math.max(-0.35, jawLineY(u) - 0.04), lerp(p.z, 0.3, 0.5));
     };
     const _o = new V3();
     const S = (u, b, t) => {
-      headSurface(u, jawLineY(u) + 0.004, t);
+      shellAt(u, jawLineY(u) + 0.004, t);
       headNormal(u, jawLineY(u), _t);
       t.addScaledVector(_t, -0.006);
       inner(u, _o);
