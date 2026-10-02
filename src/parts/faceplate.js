@@ -112,11 +112,12 @@ export function build(ctx) {
   const frameMat = M.get('gunmetal', { color: 0x5a6068, roughness: 0.36, side: THREE.DoubleSide, edge: 2.4 });
   // the mid-face (shield + inner cheek layer) reads darker than the bright V bands
   // large flat plates: darker, rougher gunmetal; `edge` brightens the polished bevels
-  const midA = M.get('gunmetal', { color: 0x5e646c, roughness: 0.5, panel: 7, seed: 55, lineWidth: 0.0026, lineDepth: 0.75, edge: 2.6 });
+  const midA = M.get('gunmetal', { color: 0x50565e, roughness: 0.62, panel: 7, seed: 55, lineWidth: 0.0026, lineDepth: 0.75, edge: 2.6 });
   const midB = M.get('gunmetal', { color: 0x555b63, roughness: 0.52, panel: 9, seed: 57, lineWidth: 0.0024, lineDepth: 0.75, edge: 2.6 });
   const midC = M.get('gunmetal', { color: 0x686e76, roughness: 0.46, panel: 8, seed: 59, lineWidth: 0.0024, lineDepth: 0.75, edge: 2.4 });
   const gun = M.get('gunmetal', { color: 0x8c929a, panel: 8, seed: 13, lineWidth: 0.0028, lineDepth: 0.8 });
-  const keelMat = M.get('gunmetal', { color: 0x80868e, roughness: 0.36, panel: 6, seed: 65, lineWidth: 0.0026, lineDepth: 0.75, edge: 2.6 });
+  const keelMat = M.get('gunmetal', { color: 0x60666e, roughness: 0.58, panel: 6, seed: 65, lineWidth: 0.0026, lineDepth: 0.75, edge: 1.8 });
+  const noseLowMat = M.get('gunmetal', { color: 0x5a6068, roughness: 0.56, panel: 9, seed: 67, lineWidth: 0.0024, lineDepth: 0.7, edge: 1.8 });
   const browMat = M.get('gunmetal', { color: 0x7a8088, roughness: 0.34, panel: 6, seed: 61, lineWidth: 0.0026, lineDepth: 0.75, edge: 2.4 });
   const browMatB = M.get('gunmetal', { color: 0x868c94, roughness: 0.32, panel: 7, seed: 63, lineWidth: 0.0026, lineDepth: 0.75, edge: 2.2 });
   const under = M.get('darkMetal', { panel: 10, seed: 21, lineWidth: 0.0025, side: THREE.DoubleSide });
@@ -224,7 +225,7 @@ export function build(ctx) {
         return base(s, t, P, N) + 0.006 - 0.004 * sm(Math.abs(2 * s - 1), 0.85, 1.0) + 0.0 * cut - 0.03 * (1 - cut);
       },
     });
-    inner.add(ctx.mesh(lg, steelC, 'faceplate.nose.lower'));
+    inner.add(ctx.mesh(lg, noseLowMat, 'faceplate.nose.lower'));
     const tab = [[0.042, 0.405], [0.04, 0.37], [0.038, 0.335]];
     const tg = ribbonPlate(THREE, geo, {
       chart, railA: rail(tab, -1), railB: rail(tab, 1),
@@ -268,7 +269,9 @@ export function build(ctx) {
         const e = anatomy.LANDMARKS.eyeL;
         if (nx * (x - side * e[0]) + ny * (y - e[1]) < 0) { nx = -nx; ny = -ny; }
         const o = side * x - e[0], v = y - e[1];
-        const w = lerp(0.12, 1, sm(o, -0.19, 0.04)) * (v > 0 ? lerp(1, 0.75, sm(v, 0.0, 0.07)) : 1) * (1 + 0.35 * sm(o, 0.08, 0.17));
+        // round 7: the outer corner stays a sharp point (face close-up), so the
+        // rings thin out there instead of bulging into a rounded goggle rim
+        const w = lerp(0.12, 1, sm(o, -0.19, 0.04)) * (v > 0 ? lerp(1, 0.6, sm(v, 0.0, 0.06)) : 1) * (1 - 0.45 * sm(o, 0.06, 0.17));
         base.push([x, y, nx, ny, w]);
       }
       const ringLoop = (d, h) => base.map(([x, y, nx, ny, w]) => {
@@ -301,8 +304,10 @@ export function build(ctx) {
     // lower edge hoods the socket top and wraps down its outer side
     // sits TIGHT on the socket top (no helmet arch): a low band from the shield
     // top out to the temple whose top edge meets the forehead plates
-    const bLow = rail([[0.14, 0.93], [0.2, 0.953], [0.27, 0.978], [0.35, 0.994], [0.43, 1.004], [0.5, 1.0], [0.545, 0.978], [0.56, 0.95]], side);
-    const bTop = rail([[0.11, 1.072], [0.18, 1.08], [0.26, 1.092], [0.34, 1.106], [0.44, 1.124], [0.53, 1.13], [0.59, 1.09], [0.605, 1.02], [0.6, 0.95]], side);
+    const bLow = rail([[0.14, 0.935], [0.2, 0.958], [0.27, 0.98], [0.35, 0.995], [0.43, 1.002], [0.5, 0.997], [0.56, 1.0], [0.61, 1.03]], side);
+    // narrow angular ridge (face close-up): a near-straight top edge rising gently
+    // outward to a pointed outer end (no arch / temple leg)
+    const bTop = rail([[0.11, 1.055], [0.18, 1.062], [0.26, 1.07], [0.34, 1.078], [0.42, 1.086], [0.5, 1.09], [0.56, 1.086], [0.61, 1.058]], side);
     // three angular layers, stepping down from the overhang to the forehead
     const layers = [
       // heavy angular hood: the lower layer juts well forward of the socket
